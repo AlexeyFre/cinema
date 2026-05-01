@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <!-- Мета-тег для корректного отображения на мобильных устройствах (особенно iPhone) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Кино для двоих 🍿</title>
+    
+    <!-- Подключаем Firebase (версия compat для простоты работы в одном файле) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+    <style>
+        /* БАЗОВЫЕ СТИЛИ И ТЕМНАЯ ТЕМА */
+        :root {
+            --bg-color: #050505;
+            --primary-color: #E50914; /* Кинематографичный красный */
+            --text-color: #f1f1f1;
+            --glass-bg: rgba(20, 20, 20, 0.85);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden; /* Запрещаем прокрутку страницы */
+        }
+
+        /* ЭКРАН ВХОДА */
+        #login-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle, #1a1a1a 0%, #000000 100%);
+            z-index: 1000;
+        }
+
+        .login-box {
+            background: var(--glass-bg);
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #333;
+            max-width: 90%;
+            width: 350px;
+        }
+
+        .login-box h1 { margin-bottom: 20px; font-weight: 300; }
+        
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            background: #111;
+            color: white;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            margin-bottom: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #ccc;
+        }
+        
+        .checkbox-label input { margin-right: 10px; width: 18px; height: 18px; }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-weight: bold;
+        }
+        button:hover { background-color: #b20710; }
+
+        /* ОСНОВНОЙ ЭКРАН С ВИДЕО */
+        #app-screen {
+            display: none; /* Скрыто до авторизации */
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            background: black;
+            object-fit: contain; /* Видео не обрезается */
+        }
+
+        /* ПАНЕЛЬ АДМИНИСТРАТОРА */
+        #admin-panel {
+            display: none;
+            position: absolute;
+            top: 10px; left: 10px; right: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 100;
+            gap: 10px;
+            backdrop-filter: blur(5px);
+            align-items: center;
+        }
+        #admin-panel input[type="text"] { margin-bottom: 0; flex-grow: 1; }
+        #admin-panel button { width: auto; padding: 10px 15px; }
+
+        /* КНОПКА ЗАГРУЗКИ СУБТИТРОВ */
+        .subtitles-wrapper {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+        }
+        .file-upload-label {
+            background: rgba(255,255,255,0.1);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .file-upload-label:hover { background: rgba(255,255,255,0.2); }
+        input[type="file"] { display: none; }
+
+        /* ПЛАВАЮЩАЯ КНОПКА ЧАТА */
+        #chat-float-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background: rgba(30, 30, 30, 0.6);
+            border: 2px solid #444;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 200;
+            backdrop-filter: blur(10px);
+            user-select: none;
+            touch-action: none; /* Важно для перетаскивания на мобильных */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: background 0.2s;
+        }
+        #chat-float-btn:active { background: rgba(50, 50, 50, 0.8); }
+
+        /* ИНДИКАТОР НОВЫХ СООБЩЕНИЙ */
+        #chat-badge {
+            position: absolute;
+            top: 0; right: 0;
+            width: 14px; height: 14px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            display: none; /* Скрыт по умолчанию */
+        }
+
+        /* ОВЕРЛЕЙ ЧАТА */
+        #chat-overlay {
+            display: none; /* Скрыт по умолчанию */
+            position: fixed;
+            bottom: 100px;
+            right: 30px;
+            width: 320px;
+            height: 400px;
+            max-height: 60vh; /* Ограничение высоты для ландшафтного режима */
+            background: rgba(20, 20, 20, 0.7);
+            border: 1px solid #444;
+            border-radius: 12px;
+            backdrop-filter: blur(15px);
+            z-index: 150;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        @media (max-width: 600px) {
+            /* Адаптация чата для мобильных */
+            #chat-overlay {
+                width: 90vw;
+                right: 5vw;
+                bottom: 90px;
+            }
+        }
+
+        #chat-header {
+            padding: 10px 15px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+        }
+        #chat-close { cursor: pointer; color: #888; font-size: 20px; }
+        #chat-close:hover { color: white; }
+
+        #chat-messages {
+            flex-grow: 1;
+            padding: 10px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; font-size: 14px; line-height: 1.4; }
+        .msg.my-msg { background: var(--primary-color); align-self: flex-end; border-bottom-right-radius: 2px;}
+        .msg.other-msg { background: #333; align-self: flex-start; border-bottom-left-radius: 2px;}
+        .msg-name { font-size: 10px; color: #ccc; margin-bottom: 2px; }
+
+        #chat-input-area {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #444;
+            background: rgba(0,0,0,0.3);
+        }
+        #chat-input-area input {
+            flex-grow: 1;
+            padding: 8px 12px;
+            border-radius: 20px;
+            border: 1px solid #555;
+            background: #222;
+            color: white;
+            outline: none;
+        }
+        #chat-input-area button {
+            width: auto;
+            margin-left: 8px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            background: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ЭКРАН АВТОРИЗАЦИИ -->
+    <div id="login-screen">
+        <div class="login-box">
+            <h1>Кино для двоих</h1>
+            <input type="text" id="username" placeholder="Ваше имя (например, Зайка)">
+            <!-- ПАРОЛЬ МЕНЯЕТСЯ ЗДЕСЬ (В JS КОДЕ НИЖЕ ТОЖЕ) -->
+            <input type="password" id="password" placeholder="Секретный пароль">
+            <label class="checkbox-label">
+                <input type="checkbox" id="isAdminCheck">
+                Я Администратор (Владелец ПК)
+            </label>
+            <button onclick="login()">Войти 🍿</button>
+        </div>
+    </div>
+
+    <!-- ОСНОВНОЙ ЭКРАН -->
+    <div id="app-screen">
+        
+        <!-- Панель управления видео (только для Админа) -->
+        <div id="admin-panel">
+            <input type="text" id="video-url" placeholder="Вставьте прямую ссылку на .mp4">
+            <button onclick="loadVideo()">Загрузить</button>
+        </div>
+
+        <!-- Видеоплеер -->
+        <!-- playsinline - важно для iPhone, чтобы видео не уходило в нативный полноэкранный плеер iOS сразу -->
+        <video id="cinema-video" playsinline>
+            Ваш браузер не поддерживает HTML5 видео.
+        </video>
+
+        <!-- Кнопка загрузки субтитров -->
+        <div class="subtitles-wrapper">
+            <label class="file-upload-label">
+                + Субтитры (.vtt)
+                <input type="file" accept=".vtt" id="subtitles-input" onchange="loadSubtitles(event)">
+            </label>
+        </div>
+
+        <!-- Плавающая кнопка чата -->
+        <div id="chat-float-btn">
+            💬
+            <div id="chat-badge"></div>
+        </div>
+
+        <!-- Оверлей чата -->
+        <div id="chat-overlay">
+            <div id="chat-header">
+                <span>Чат</span>
+                <span id="chat-close" onclick="toggleChat()">×</span>
+            </div>
+            <div id="chat-messages"></div>
+            <div id="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Написать..." onkeypress="handleChatEnter(event)">
+                <button onclick="sendMessage()">➤</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // НАСТРОЙКИ
+        // ==========================================
+        
+        // Измените пароль здесь
+        const CORRECT_PASSWORD = "love123";
+
+        // Конфигурация Firebase (ваши данные)
+        const firebaseConfig = {
+            apiKey: "AIzaSyBatXdgIXXW5c4VFibd24bhoAockReJPrE",
+            authDomain: "our-cinema-20c0f.firebaseapp.com",
+            databaseURL: "https://our-cinema-20c0f-default-rtdb.europe-west1.firebasedatabase.app/",
+            projectId: "our-cinema-20c0f",
+            storageBucket: "our-cinema-20c0f.firebasestorage.app",
+            messagingSenderId: "970156344935",
+            appId: "1:970156344935:web:74ecce58fb40f4579636c2"
+        };
+
+        // Инициализация Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const syncRef = db.ref('sync');
+        const chatRef = db.ref('chat');
+
+        // ==========================================
+        // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+        // ==========================================
+        let currentUser = "Аноним";
+        let isAdmin = false;
+        let isChatOpen = false;
+        const video = document.getElementById('cinema-video');
+
+        // ==========================================
+        // ЛОГИКА АВТОРИЗАЦИИ
+        // ==========================================
+        function login() {
+            const passInput = document.getElementById('password').value;
+            const nameInput = document.getElementById('username').value.trim();
+            const adminCheck = document.getElementById('isAdminCheck').checked;
+
+            if (passInput !== CORRECT_PASSWORD) {
+                alert("Неверный пароль! 💔");
+                return;
+            }
+
+            if (nameInput) currentUser = nameInput;
+            isAdmin = adminCheck;
+
+            // Скрываем окно логина, показываем плеер
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('app-screen').style.display = 'block';
+
+            // Настройка плеера в зависимости от роли
+            if (isAdmin) {
+                video.controls = true; // Админ видит стандартные элементы управления
+                document.getElementById('admin-panel').style.display = 'flex';
+                initAdminSync();
+            } else {
+                video.controls = false; // Клиент не может управлять видео
+                initClientSync();
+            }
+
+            // Трюк для мобильных (особенно iOS): 
+            // Браузеры требуют взаимодействия с пользователем для начала воспроизведения видео/аудио.
+            // Клик по кнопке "Войти" является таким взаимодействием. Мы инициализируем аудиоконтекст.
+            video.load();
+            
+            // Инициализируем чат
+            initChat();
+        }
+
+        // ==========================================
+        // ЛОГИКА СИНХРОНИЗАЦИИ ВИДЕО
+        // ==========================================
+
+        // Функция для загрузки видео по ссылке (Только Админ)
+        function loadVideo() {
+            const url = document.getElementById('video-url').value;
+            if(url) {
+                video.src = url;
+                syncRef.update({ videoUrl: url, time: 0, isPlaying: false });
+            }
+        }
+
+        function initAdminSync() {
+            // Админ отправляет команды в Firebase
+            
+            video.addEventListener('play', () => {
+                syncRef.update({ isPlaying: true, time: video.currentTime });
+            });
+
+            video.addEventListener('pause', () => {
+                syncRef.update({ isPlaying: false, time: video.currentTime });
+            });
+
+            video.addEventListener('seeked', () => {
+                syncRef.update({ time: video.currentTime });
+            });
+
+            // Периодическое обновление времени (чтобы зритель не отставал из-за буферизации)
+            setInterval(() => {
+                if (!video.paused) {
+                    syncRef.update({ time: video.currentTime });
+                }
+            }, 3000); // каждые 3 секунды отправляем точное время
+        }
+
+        function initClientSync() {
+            // Клиент только слушает Firebase и подчиняется
+            
+            syncRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (!data) return;
+
+                // Если Админ сменил видео
+                if (data.videoUrl && video.src !== data.videoUrl) {
+                    video.src = data.videoUrl;
+                }
+
+                // Синхронизация времени: если разница больше 1.5 секунд - перематываем
+                if (Math.abs(video.currentTime - data.time) > 1.5) {
+                    video.currentTime = data.time;
+                }
+
+                // Синхронизация Play/Pause
+                if (data.isPlaying && video.paused) {
+                    let playPromise = video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.log("Автовоспроизведение блокировано браузером. Требуется клик пользователя.");
+                        });
+                    }
+                } else if (!data.isPlaying && !video.paused) {
+                    video.pause();
+                }
+            });
+
+            // Блокируем любые клики по видео для клиента, чтобы он не останавливал плеер
+            video.style.pointerEvents = 'none';
+        }
+
+        // ==========================================
+        // ЛОГИКА СУБТИТРОВ (.VTT)
+        // ==========================================
+        function loadSubtitles(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Создаем локальную ссылку на файл
+            const objectURL = URL.createObjectURL(file);
+            
+            // Проверяем, есть ли уже трек
+            let track = document.getElementById('custom-subtitles');
+            if (!track) {
+                track = document.createElement('track');
+                track.id = 'custom-subtitles';
+                track.kind = 'subtitles';
+                track.label = 'Русский';
+                track.srclang = 'ru';
+                video.appendChild(track);
+            }
+
+            track.src = objectURL;
+            track.default = true;
+
+            // Принудительно включаем отображение субтитров
+            setTimeout(() => {
+                if(video.textTracks && video.textTracks.length > 0) {
+                    video.textTracks[0].mode = 'showing';
+                }
+            }, 500);
+        }
+
+        // ==========================================
+        // ЛОГИКА ЧАТА
+        // ==========================================
+        const messagesDiv = document.getElementById('chat-messages');
+        const badge = document.getElementById('chat-badge');
+        const chatOverlay = document.getElementById('chat-overlay');
+        const chatInput = document.getElementById('chat-input');
+
+        function toggleChat() {
+            isChatOpen = !isChatOpen;
+            if (isChatOpen) {
+                chatOverlay.style.display = 'flex';
+                badge.style.display = 'none'; // Скрываем индикатор
+                scrollToBottom();
+            } else {
+                chatOverlay.style.display = 'none';
+            }
+        }
+
+        function initChat() {
+            chatRef.on('child_added', (snapshot) => {
+                const msg = snapshot.val();
+                
+                // Создаем элемент сообщения
+                const div = document.createElement('div');
+                div.classList.add('msg');
+                div.classList.add(msg.sender === currentUser ? 'my-msg' : 'other-msg');
+                
+                // Добавляем имя
+                const nameSpan = document.createElement('div');
+                nameSpan.classList.add('msg-name');
+                nameSpan.innerText = msg.sender;
+                
+                // Добавляем текст
+                const textSpan = document.createElement('span');
+                textSpan.innerText = msg.text;
+
+                div.appendChild(nameSpan);
+                div.appendChild(textSpan);
+                
+                messagesDiv.appendChild(div);
+                
+                if (isChatOpen) {
+                    scrollToBottom();
+                } else if (msg.sender !== currentUser) {
+                    // Если чат закрыт и сообщение не от нас — показываем красную точку
+                    badge.style.display = 'block';
+                }
+            });
+        }
+
+        function sendMessage() {
+            const text = chatInput.value.trim();
+            if (text === "") return;
+
+            chatRef.push({
+                sender: currentUser,
+                text: text,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+
+            chatInput.value = "";
+        }
+
+        function handleChatEnter(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function scrollToBottom() {
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // ==========================================
+        // ПЕРЕТАСКИВАНИЕ КНОПКИ ЧАТА (DRAG & DROP)
+        // ==========================================
+        const floatBtn = document.getElementById('chat-float-btn');
+        let isDragging = false;
+        let isMoved = false;
+        let startX, startY;
+        let initialLeft, initialTop;
+
+        const dragStart = (e) => {
+            isDragging = true;
+            isMoved = false; // Флаг для отличия клика от перетаскивания
+            
+            // Получаем координаты в зависимости от типа события (мышь или тач)
+            const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+            
+            startX = clientX;
+            startY = clientY;
+            
+            const rect = floatBtn.getBoundingClientRect();
+            initialLeft = rect.left;
+            initialTop = rect.top;
+
+            // Убираем right/bottom чтобы позиционировать строго по left/top
+            floatBtn.style.right = 'auto';
+            floatBtn.style.bottom = 'auto';
+        };
+
+        const dragMove = (e) => {
+            if (!isDragging) return;
+            
+            const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+            
+            const diffX = clientX - startX;
+            const diffY = clientY - startY;
+
+            // Если сдвинули больше чем на 5px - считаем что это перетаскивание, а не клик
+            if (Math.abs(diffX) > 5 || Math.abs(diffY) > 5) {
+                isMoved = true;
+                e.preventDefault(); // Предотвращаем скролл экрана при перетаскивании
+            }
+
+            // Ограничиваем вылет за границы экрана
+            let newLeft = initialLeft + diffX;
+            let newTop = initialTop + diffY;
+            
+            newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - floatBtn.offsetWidth));
+            newTop = Math.max(0, Math.min(newTop, window.innerHeight - floatBtn.offsetHeight));
+
+            floatBtn.style.left = newLeft + 'px';
+            floatBtn.style.top = newTop + 'px';
+        };
+
+        const dragEnd = (e) => {
+            isDragging = false;
+        };
+
+        // Обработчики для мыши
+        floatBtn.addEventListener('mousedown', dragStart);
+        window.addEventListener('mousemove', dragMove, { passive: false });
+        window.addEventListener('mouseup', dragEnd);
+
+        // Обработчики для сенсорных экранов (iPhone)
+        floatBtn.addEventListener('touchstart', dragStart, { passive: false });
+        window.addEventListener('touchmove', dragMove, { passive: false });
+        window.addEventListener('touchend', dragEnd);
+
+        // Обработка клика по кнопке (открываем чат, только если не было перетаскивания)
+        floatBtn.addEventListener('click', (e) => {
+            if (!isMoved) {
+                toggleChat();
+            }
+        });
+
+    </script>
+</body>
+</html>
