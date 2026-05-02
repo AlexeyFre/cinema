@@ -427,6 +427,14 @@ body {
   -webkit-appearance: none; width: 11px; height: 11px;
   border-radius: 50%; background: #fff;
 }
+/* Mobile: shrink volume slider so fs-btn never overflows */
+@media (max-width: 767px) {
+  #vol-range { width: 38px; }
+  #vol-wrap  { margin-right: 4px; }
+  #ctrl-row  { gap: 0; }
+  .cb        { padding: 5px 5px; }
+  .cb.sm     { padding: 4px 4px; }
+}
 
 /* ═══════════════════════════════════════════════════════
    CHAT COLUMN
@@ -507,6 +515,26 @@ body {
 .msg.them .msg-bbl { background: var(--s2); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
 .msg.sys  .msg-bbl { background: none; border: none; color: var(--dim); font-size: 10px; font-style: italic; padding: 2px 6px; text-align: center; }
 .msg-time { font-size: 9px; color: var(--muted); padding: 0 3px; }
+
+/* Typing indicator */
+#typing-indicator {
+  padding: 0 12px 5px;
+  font-size: 10px; color: var(--accent);
+  letter-spacing: .06em; min-height: 18px;
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+}
+.typing-dots span {
+  display: inline-block; width: 4px; height: 4px;
+  border-radius: 50%; background: var(--accent);
+  animation: tdot 1.2s infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: .2s; }
+.typing-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes tdot {
+  0%,80%,100% { transform: scale(.6); opacity: .4; }
+  40%          { transform: scale(1);  opacity: 1;  }
+}
 
 /* Chat input */
 #chat-inp-wrap {
@@ -723,6 +751,9 @@ body {
     <!-- Messages -->
     <div id="msgs"></div>
 
+    <!-- Typing indicator -->
+    <div id="typing-indicator"></div>
+
     <!-- Input -->
     <div id="chat-inp-wrap">
       <textarea id="chat-ta" rows="1" placeholder="Сообщение…"></textarea>
@@ -787,7 +818,7 @@ function toast(msg, ms = 2500) {
 
 /* ─── State ───────────────────────────────────────── */
 let myName = '', roomId = '';
-let db_sync, db_chat, db_pres_me;   // Firebase refs
+let db_sync, db_chat, db_pres_me;   // Firebase refs (typing refs declared in initFirebaseRefs)
 let isYT = false, ytPlayer = null;
 let drawerOpen = false, unread = 0;
 let suppressSync = false;
@@ -859,11 +890,17 @@ $('enter-btn').onclick = tryEnter;
 );
 
 /* ─── Firebase refs (room-scoped) ─────────────────── */
+let db_typing_me, db_typing_room;
 function initFirebaseRefs() {
-  const base = 'rooms/' + roomId;
-  db_sync   = ref(db, base + '/sync');
-  db_chat   = ref(db, base + '/chat');
-  db_pres_me= ref(db, base + '/pres/' + myName.replace(/[.#$/[\]]/g,'_'));
+  const base    = 'rooms/' + roomId;
+  const safeKey = myName.replace(/[.#$\/\[\]]/g,'_');
+  db_sync        = ref(db, base + '/sync');
+  db_chat        = ref(db, base + '/chat');
+  db_pres_me     = ref(db, base + '/pres/'   + safeKey);
+  db_typing_me   = ref(db, base + '/typing/' + safeKey);
+  db_typing_room = ref(db, base + '/typing');
+  // Clean up typing status on disconnect
+  onDisconnect(db_typing_me).remove();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -891,15 +928,33 @@ function getYtId(url) {
   return m ? m[1] : null;
 }
 
+function setYTMode(yt) {
+  // Show/hide our custom overlay layer based on source type
+  const overlay = $('ctrl-overlay');
+  const centre  = $('centre-btn');
+  if (yt) {
+    // YouTube: hide our custom double-tap layer and centre button
+    // YT iframe has its own controls visible via the shield being removed
+    if (centre)  centre.style.display  = 'none';
+    // Keep ctrl-bar visible but disable seek feedback area
+    overlay.dataset.ytMode = '1';
+  } else {
+    // MP4: show everything
+    if (centre)  centre.style.display  = '';
+    overlay.dataset.ytMode = '';
+  }
+}
+
 function loadMP4(src) {
   destroyYT();
   const v = $('vid');
-  v.preload = 'metadata';   // Only load metadata, not the full file
+  v.preload = 'metadata';
   v.src = src;
   v.style.display = 'block';
   $('yt-wrap').classList.remove('on');
   $('ph').style.display = 'none';
   isYT = false;
+  setYTMode(false);
   v.load();
   applyVtt();
   toast('Загружаю видео…');
@@ -912,6 +967,7 @@ function loadYT(id) {
   $('yt-wrap').classList.add('on');
   $('ph').style.display = 'none';
   isYT = true;
+  setYTMode(true);
   // Load YT API if needed
   if (window.YT && window.YT.Player) { buildYT(id); return; }
   window.__ytCb = () => buildYT(id);
@@ -988,8 +1044,17 @@ function initPlayer() {
   /* Centre play/pause button */
   $('centre-btn').onclick = e => { e.stopPropagation(); togglePlay(); pushSync(); showCtrl(); };
 
-  /* YT tap shield — intercept clicks on YT iframe */
-  $('yt-shield').onclick = e => { e.stopPropagation(); togglePlay(); pushSync(); showCtrl(); };
+  /* YT tap shield — desktop: click toggles play; mobile: pass through to YT */
+  $('yt-shield').onclick = e => {
+    e.stopPropagation();
+    if (!isTouchDevice()) {
+      // Desktop: our click handler controls play/pause
+      togglePlay(); pushSync(); showCtrl();
+    } else {
+      // Mobile: just show controls, let YT iframe handle actual play via its own touch
+      showCtrl();
+    }
+  };
 
   /* Skip */
   $('back-btn').onclick = e => { e.stopPropagation(); seekRel(-10); };
@@ -1106,13 +1171,16 @@ function initPlayer() {
       const rect = $('player-wrap').getBoundingClientRect();
       const relX = tapX - rect.left;
       const w    = rect.width;
-      // Double-tap zones: 40% | 20% (ignored) | 40%
-      if (relX < w * 0.40) {
-        seekRel(-10); showCtrl(); showSeekFeedback(-10);
-      } else if (relX > w * 0.60) {
-        seekRel(+10); showCtrl(); showSeekFeedback(+10);
+      // Double-tap seek: ONLY for MP4, not YouTube
+      // YouTube has its own seek and our overlay would conflict
+      if (!isYT) {
+        if (relX < w * 0.40) {
+          seekRel(-10); showCtrl(); showSeekFeedback(-10);
+        } else if (relX > w * 0.60) {
+          seekRel(+10); showCtrl(); showSeekFeedback(+10);
+        }
+        // Centre 20% → intentionally no action
       }
-      // Centre 20% → intentionally no action
     }
   }, { passive: true });
 
@@ -1258,14 +1326,25 @@ function showSeekFeedback(seconds) {
   el._t = setTimeout(() => { el.style.opacity = '0'; }, 800);
 }
 
-/* Fullscreen */
+/* Fullscreen — with iPhone fallback (webkitEnterFullscreen on <video>) */
 function toggleFS() {
-  const el = $('player-wrap');
+  const wrap = $('player-wrap');
+  const v    = $('vid');
   const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+
   if (!isFS) {
-    (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+    if (wrap.requestFullscreen) {
+      wrap.requestFullscreen().catch(() => {});
+    } else if (wrap.webkitRequestFullscreen) {
+      wrap.webkitRequestFullscreen();
+    } else if (!isYT && v.webkitEnterFullscreen) {
+      // iPhone Safari: only the <video> element itself can go fullscreen
+      v.webkitEnterFullscreen();
+    }
   } else {
-    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    if (document.exitFullscreen)        document.exitFullscreen().catch(() => {});
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    else if (!isYT && v.webkitExitFullscreen) v.webkitExitFullscreen();
   }
 }
 
@@ -1415,6 +1494,14 @@ function initPresence() {
 /* ═══════════════════════════════════════════════════════
    CHAT
 ═══════════════════════════════════════════════════════ */
+let typingTimer = null;
+
+function setTyping(active) {
+  if (!db_typing_me) return;
+  set(db_typing_me, active ? { name: myName, ts: Date.now() } : null)
+    .catch(() => {});
+}
+
 function initChat() {
   const ta = $('chat-ta');
 
@@ -1432,6 +1519,39 @@ function initChat() {
     ta.style.height = Math.min(ta.scrollHeight, 90) + 'px';
   });
 
+  // ── Typing indicator ──
+  ta.addEventListener('focus', () => {
+    setTyping(true);
+    clearTimeout(typingTimer);
+  });
+  ta.addEventListener('input', () => {
+    setTyping(true);
+    clearTimeout(typingTimer);
+    // Auto-clear if idle for 3s
+    typingTimer = setTimeout(() => setTyping(false), 3000);
+  });
+  ta.addEventListener('blur', () => {
+    clearTimeout(typingTimer);
+    setTyping(false);
+  });
+
+  // ── Listen to typing status ──
+  onValue(db_typing_room, snap => {
+    const data = snap.val() || {};
+    const safeMyKey = myName.replace(/[.#$\/\[\]]/g,'_');
+    const others = Object.entries(data)
+      .filter(([k, v]) => k !== safeMyKey && v && v.name)
+      .map(([, v]) => v.name);
+    const el = $('typing-indicator');
+    if (el) {
+      if (others.length > 0) {
+        el.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span> ${esc(others[0])} печатает…`;
+      } else {
+        el.innerHTML = '';
+      }
+    }
+  }, () => {});
+
   // Reaction buttons
   document.querySelectorAll('.rb').forEach(btn => {
     btn.onclick = () => {
@@ -1443,8 +1563,6 @@ function initChat() {
   });
 
   // ── Listen to chat messages ──
-  // onValue fires on every change; we re-render all messages each time.
-  // This is simple and reliable — no missed messages.
   onValue(db_chat, snap => {
     const data = snap.val();
     const msgs = $('msgs');
@@ -1452,7 +1570,7 @@ function initChat() {
 
     if (!data) return;
 
-    const entries = Object.entries(data); // [[key, msgObj], ...]
+    const entries = Object.entries(data);
 
     // Count new messages for unread badge (mobile only)
     if (!drawerOpen && window.innerWidth < 768) {
@@ -1479,6 +1597,10 @@ function sendMsg() {
   const ta   = $('chat-ta');
   const text = ta.value.trim();
   if (!text) return;
+
+  // Clear typing status immediately on send
+  clearTimeout(typingTimer);
+  setTyping(false);
 
   push(db_chat, { type:'msg', text, name:myName, ts: serverTimestamp() })
     .catch(e => { toast('Ошибка отправки ✕'); console.error('send error:', e); });
