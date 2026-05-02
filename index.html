@@ -36,12 +36,12 @@
 
 html {
   height: 100%;
-  height: -webkit-fill-available;
+  height: 100dvh;
   overflow: hidden;
 }
 body {
   height: 100%;
-  height: -webkit-fill-available;
+  height: 100dvh;
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
@@ -137,7 +137,7 @@ body {
 #app {
   display: none;
   width: 100%; height: 100%;
-  height: -webkit-fill-available;
+  height: 100dvh;
 }
 #app.on { display: flex; }
 
@@ -574,7 +574,87 @@ body {
   100% { transform: translateY(-120px) scale(1.5); opacity: 0; }
 }
 
-/* ── Toast ── */
+/* ═══════════════════════════════════════════════════════
+   CHAT-ONLY MODE (controller mode)
+═══════════════════════════════════════════════════════ */
+#app.chat-only #vcol { display: none !important; }
+#app.chat-only #ccol {
+  position: static !important;
+  width: 100% !important; height: 100dvh !important;
+  transform: none !important; border-radius: 0 !important;
+  border-top: none !important;
+}
+#app.chat-only #backdrop  { display: none !important; }
+#app.chat-only #m-handle  { display: none !important; }
+#app.chat-only #peek-row  { display: none !important; }
+#app.chat-only #chat-hdr  { display: block !important; }
+
+/* chat-only checkbox */
+.chat-only-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 2px 0;
+}
+.chat-only-row input[type=checkbox] {
+  width: 16px; height: 16px;
+  accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
+}
+.chat-only-row label {
+  font-size: 11px; color: var(--dim);
+  cursor: pointer; line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════════════
+   STATUS BAR (participant timecodes)
+═══════════════════════════════════════════════════════ */
+#status-bar {
+  display: flex; flex-wrap: wrap; gap: 4px 10px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; min-height: 24px;
+  align-items: center;
+}
+.sb-item {
+  font-size: 10px; color: var(--dim);
+  letter-spacing: .04em; white-space: nowrap;
+}
+.sb-item b { color: var(--accent); }
+
+/* ═══════════════════════════════════════════════════════
+   QUICK PHRASES
+═══════════════════════════════════════════════════════ */
+#quick-phrases {
+  display: flex; gap: 5px; flex-wrap: wrap;
+  padding: 6px 10px 2px;
+  flex-shrink: 0;
+}
+.qp-btn {
+  background: var(--s3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 9px;
+  font-size: 11px; color: var(--dim);
+  cursor: pointer; -webkit-appearance: none;
+  transition: border-color .12s, color .12s, background .12s;
+  white-space: nowrap;
+}
+.qp-btn:hover  { border-color: var(--accent); color: var(--accent); }
+.qp-btn:active { background: rgba(201,149,110,.1); transform: scale(.94); }
+
+/* ═══════════════════════════════════════════════════════
+   TAP-TO-PLAY overlay (iOS autoplay blocked)
+═══════════════════════════════════════════════════════ */
+#tap-to-play {
+  position: absolute; inset: 0; z-index: 30;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.45);
+  cursor: pointer;
+}
+#tap-to-play span {
+  background: rgba(9,9,15,.85);
+  border: 1px solid var(--accent);
+  border-radius: 14px; padding: 12px 22px;
+  font-size: 13px; color: var(--accent);
+  letter-spacing: .1em; pointer-events: none;
+}
+
 #toast {
   position: fixed; bottom: 68px; left: 50%;
   transform: translateX(-50%) translateY(10px);
@@ -626,6 +706,10 @@ body {
     </div>
 
     <button class="lock-enter" id="enter-btn">Войти в кино →</button>
+    <div class="chat-only-row">
+      <input type="checkbox" id="chat-only-cb">
+      <label for="chat-only-cb">Только чат</label>
+    </div>
     <div class="lock-err" id="lock-err"></div>
 
     <div class="lock-note">
@@ -705,6 +789,9 @@ body {
         </div>
       </div>
 
+      <!-- Tap-to-play overlay for iOS -->
+      <div id="tap-to-play"><span>▶ Нажми, чтобы начать</span></div>
+
       <!-- Sync pill -->
       <div id="sync-pill">
         <div class="sdot" id="sdot"></div>
@@ -738,6 +825,9 @@ body {
       <div class="ch-sub"><span class="odot"></span><span id="partner-lbl">Ожидание партнёра…</span></div>
     </div>
 
+    <!-- Participant timecodes -->
+    <div id="status-bar"></div>
+
     <!-- Reactions -->
     <div id="react-bar">
       <button class="rb" data-e="❤️">❤️</button>
@@ -753,6 +843,13 @@ body {
 
     <!-- Typing indicator -->
     <div id="typing-indicator"></div>
+
+    <!-- Quick phrases -->
+    <div id="quick-phrases">
+      <button class="qp-btn" data-phrase="Минуту ⏱">Минуту ⏱</button>
+      <button class="qp-btn" data-phrase="Я в туалет 🚽">Я в туалет 🚽</button>
+      <button class="qp-btn" data-phrase="Подожди, проблема ⚠️">Подожди, проблема ⚠️</button>
+    </div>
 
     <!-- Input -->
     <div id="chat-inp-wrap">
@@ -827,6 +924,8 @@ let ctrlHideTimer;
 let ctrlVisible = true;
 let progDragging = false;
 let knownMsgKeys = new Set();
+let chatOnlyMode = false;   // controller mode: chat only, no video
+let lastPlayTs   = 0;       // timestamp when video last started (anti-loop)
 
 /* ═══════════════════════════════════════════════════════
    ENTRY
@@ -856,32 +955,56 @@ function tryEnter() {
   err.textContent = '';
   myName = name;
   roomId = room;
+  chatOnlyMode = $('chat-only-cb').checked;
 
   $('lock').style.display   = 'none';
   $('app').classList.add('on');
+  if (chatOnlyMode) $('app').classList.add('chat-only');
   $('room-lbl').textContent = roomId;
-  $('user-pill').textContent = myName;
+  if (!chatOnlyMode) $('user-pill').textContent = myName;
 
   initFirebaseRefs();
-  initPlayer();
-  initSync();
+  if (!chatOnlyMode) {
+    initPlayer();
+    initSync();
+  }
   initChat();
   initPresence();
-  initDrawer();
-  initKeyboard();
-  initKeyboardShortcuts();
+  if (!chatOnlyMode) {
+    initDrawer();
+    initKeyboard();
+    initKeyboardShortcuts();
+  } else {
+    // In chat-only mode show partner label in the always-visible header
+    $('partner-lbl').textContent = 'Ожидание партнёра…';
+  }
 
-  // Safari iOS: unlock audio/video context on user gesture (the Enter button tap)
-  // Without this, programmatic .play() calls silently fail until user taps the video.
-  const v = $('vid');
-  v.muted = true;
-  v.play().then(() => {
-    v.pause();
-    v.currentTime = 0;
-    v.muted = false;
-  }).catch(() => {
-    v.muted = false; // already unlocked or not needed
-  });
+  // ── iOS audio unlock via AudioContext ──
+  // Must happen inside a user-gesture handler (this button click IS one)
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      const ctx = new AC();
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf; src.connect(ctx.destination); src.start(0);
+      setTimeout(() => ctx.close(), 200);
+    }
+  } catch(e) {}
+
+  // ── iOS video unlock (пункт 6) ──
+  // Attempt muted play/pause while still in user-gesture context.
+  // We try on ALL <video> elements on the page.
+  if (!chatOnlyMode) {
+    document.querySelectorAll('video').forEach(v => {
+      v.muted = true;
+      v.play().then(() => {
+        v.pause();
+        v.currentTime = 0;
+        v.muted = false;
+      }).catch(() => { v.muted = false; });
+    });
+  }
 }
 
 $('enter-btn').onclick = tryEnter;
@@ -929,18 +1052,21 @@ function getYtId(url) {
 }
 
 function setYTMode(yt) {
-  // Show/hide our custom overlay layer based on source type
   const overlay = $('ctrl-overlay');
   const centre  = $('centre-btn');
+  const shield  = $('yt-shield');
   if (yt) {
-    // YouTube: hide our custom double-tap layer and centre button
-    // YT iframe has its own controls visible via the shield being removed
+    // Пункт 5: YouTube — скрываем все кастомные слои, пользователь взаимодействует
+    // напрямую с нативным плеером YouTube (controls: 1)
     if (centre)  centre.style.display  = 'none';
-    // Keep ctrl-bar visible but disable seek feedback area
+    if (shield)  shield.style.display  = 'none';
+    overlay.style.display = 'none';
     overlay.dataset.ytMode = '1';
   } else {
-    // MP4: show everything
+    // MP4 — показываем кастомный плеер с зонами перемотки
     if (centre)  centre.style.display  = '';
+    if (shield)  shield.style.display  = '';
+    overlay.style.display = '';
     overlay.dataset.ytMode = '';
   }
 }
@@ -993,8 +1119,10 @@ function buildYT(id) {
     width: '100%', height: '100%',
     playerVars: {
       playsinline: 1, rel: 0,
-      modestbranding: 1, controls: 0, fs: 0,
-      iv_load_policy: 3, disablekb: 1
+      modestbranding: 1,
+      // Пункт 5: для YouTube используем нативные контролы — особенно важно на iOS
+      controls: 1, fs: 1,
+      iv_load_policy: 3
     },
     events: {
       onReady() {
@@ -1006,7 +1134,7 @@ function buildYT(id) {
       },
       onStateChange(e) {
         syncPlayIcon(e.data === YT.PlayerState.PLAYING);
-        if (!suppressSync) pushSync();
+        if (!suppressSync && !chatOnlyMode) pushSync();
       }
     }
   });
@@ -1106,6 +1234,25 @@ function initPlayer() {
   /* Fullscreen */
   $('fs-btn').onclick = e => { e.stopPropagation(); toggleFS(); };
 
+  /* Tap-to-play overlay (iOS autoplay blocked) */
+  const ttp = $('tap-to-play');
+  if (ttp) {
+    ttp.addEventListener('click', () => {
+      const v = $('vid');
+      v.play().then(() => { ttp.style.display = 'none'; }).catch(() => {});
+    });
+    ttp.addEventListener('touchend', e => {
+      e.preventDefault();
+      const v = $('vid');
+      v.play().then(() => { ttp.style.display = 'none'; }).catch(() => {});
+    });
+  }
+
+  /* iOS: скрываем tap-to-play при успешном старте */
+  v.addEventListener('play', () => {
+    if (ttp) ttp.style.display = 'none';
+  });
+
   /* ── Desktop: click anywhere on video = play/pause ──
      On touch devices 'click' fires after touchend — we must ignore it
      there to prevent ghost pauses. Only real mouse clicks count.
@@ -1196,8 +1343,14 @@ function initPlayer() {
         : '<polygon points="5,3 19,12 5,21"/>';
     }
   }
-  v.addEventListener('play',  () => syncPlayIcon(true));
-  v.addEventListener('pause', () => syncPlayIcon(false));
+  v.addEventListener('play',  () => { syncPlayIcon(true);  lastPlayTs = Date.now(); });
+  v.addEventListener('pause', () => {
+    syncPlayIcon(false);
+    // Пункт 7: анти-петля — если видео запущено менее 3с назад, не шлём pause в Firebase
+    // Это защита от ситуации, когда буфер ещё не загружен и Safari ставит паузу сам
+    if (Date.now() - lastPlayTs < 3000) return;
+    if (!suppressSync && !chatOnlyMode) pushSync();
+  });
   v.addEventListener('timeupdate',     updateProg);
   v.addEventListener('durationchange', updateProg);
   v.addEventListener('waiting',        () => setSS('warn','Буферизация…'));
@@ -1389,6 +1542,8 @@ function initKeyboardShortcuts() {
 let lastPushTs = 0;
 
 function pushSync() {
+  // Пункт 1: в режиме «только чат» не отправляем команды управления
+  if (chatOnlyMode) return;
   const now = Date.now();
   lastPushTs = now;
   const payload = {
@@ -1408,6 +1563,8 @@ function initSync() {
   onValue(db_sync, snap => {
     const d = snap.val();
     if (!d) { setSS('ok', 'Готово'); return; }
+    // Пункт 1: в режиме «только чат» игнорируем входящие команды синхронизации
+    if (chatOnlyMode) return;
 
     const age = Date.now() - (d.ts || 0);
 
@@ -1448,8 +1605,17 @@ function applyRemote(d) {
     ? (d.time || 0) + ageSec   // compensate latency
     : (d.time || 0);
 
-  // Seek if drift > threshold
-  if (Math.abs(getCur() - targetTime) > SYNC_DRIFT) {
+  // Пункт 2: синхронизация «по медленному»
+  // Если мы ОПЕРЕЖАЕМ Firebase на >2с — тянемся назад (ждём отставшего)
+  // Если мы ОТСТАЁМ более чем на 30с — догоняем (например, только зашли)
+  // Если отстаём менее чем на 30с — не трогаем, пусть догоняет сам
+  const drift = getCur() - targetTime; // > 0 = я впереди
+  if (drift > SYNC_DRIFT) {
+    seekAbs(targetTime, false);
+    setSS('warn', 'Синхронизация…');
+    setTimeout(() => setSS('ok', 'Синхронизировано'), 1500);
+  } else if (drift < -30) {
+    // Сильно отстали (новый участник или пропала связь): догоняем
     seekAbs(targetTime, false);
     setSS('warn', 'Синхронизация…');
     setTimeout(() => setSS('ok', 'Синхронизировано'), 1500);
@@ -1460,7 +1626,13 @@ function applyRemote(d) {
   // Play / pause
   if (d.playing && !isPlaying()) {
     if (isYT) { if (ytPlayer) ytPlayer.playVideo(); }
-    else $('vid').play().catch(() => {});
+    else {
+      $('vid').play().catch(() => {
+        // iOS заблокировал автовоспроизведение — показываем кнопку
+        const ttp = $('tap-to-play');
+        if (ttp) ttp.style.display = 'flex';
+      });
+    }
   } else if (!d.playing && isPlaying()) {
     if (isYT) { if (ytPlayer) ytPlayer.pauseVideo(); }
     else $('vid').pause();
@@ -1477,17 +1649,38 @@ function setSS(state, text) {
    PRESENCE
 ═══════════════════════════════════════════════════════ */
 function initPresence() {
-  set(db_pres_me, { name: myName, online: true });
+  // Обновляем своё присутствие + текущий таймкод
+  function pushPresence() {
+    const payload = { name: myName, online: true };
+    if (!chatOnlyMode) payload.time = getCur();
+    set(db_pres_me, payload);
+  }
+  pushPresence();
   onDisconnect(db_pres_me).remove();
+
+  // Обновляем свой таймкод каждые 2с
+  if (!chatOnlyMode) setInterval(pushPresence, 2000);
 
   const presRoomRef = ref(db, 'rooms/' + roomId + '/pres');
   onValue(presRoomRef, snap => {
     const data  = snap.val() || {};
-    const others = Object.values(data)
-      .filter(u => u && u.name && u.name !== myName && u.online);
+    const users = Object.values(data).filter(u => u && u.name && u.online);
+
+    // Партнёр-лейбл
+    const others = users.filter(u => u.name !== myName);
     $('partner-lbl').textContent = others.length
       ? others.map(u => u.name).join(', ') + ' здесь ❤'
       : 'Ожидание партнёра…';
+
+    // Пункт 3: статус-бар с таймкодами
+    const bar = $('status-bar');
+    if (bar) {
+      bar.innerHTML = users.map(u => {
+        const tc = (typeof u.time === 'number' && u.time >= 0) ? fmt(u.time) : '—';
+        const isMe = u.name === myName;
+        return `<span class="sb-item">${isMe ? '👤' : '👁'} <b>${esc(u.name)}</b>: ${tc}</span>`;
+      }).join('');
+    }
   });
 }
 
@@ -1559,6 +1752,16 @@ function initChat() {
       push(db_chat, { type:'reaction', emoji, name:myName, ts: serverTimestamp() })
         .catch(e => console.error('reaction push:', e));
       spawnFloat(emoji, btn);
+    };
+  });
+
+  // Пункт 4: быстрые фразы
+  document.querySelectorAll('.qp-btn').forEach(btn => {
+    btn.onclick = () => {
+      const text = btn.dataset.phrase;
+      if (!text) return;
+      push(db_chat, { type:'msg', text, name:myName, ts: serverTimestamp() })
+        .catch(e => console.error('quick phrase push:', e));
     };
   });
 
