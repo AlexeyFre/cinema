@@ -36,13 +36,11 @@
 
 html {
   height: 100%;
-  height: 100dvh;
   height: -webkit-fill-available;
   overflow: hidden;
 }
 body {
   height: 100%;
-  height: 100dvh;
   height: -webkit-fill-available;
   overflow: hidden;
   background: var(--bg);
@@ -139,7 +137,6 @@ body {
 #app {
   display: none;
   width: 100%; height: 100%;
-  height: 100dvh;
   height: -webkit-fill-available;
 }
 #app.on { display: flex; }
@@ -162,7 +159,7 @@ body {
   #app { flex-direction: column; position: relative; }
   #vcol {
     /* Take full height minus the 52px peek strip */
-    height: calc(100dvh - 52px);
+    height: calc(100% - 52px);
     flex-shrink: 0;
     display: flex; flex-direction: column; overflow: hidden;
   }
@@ -421,28 +418,14 @@ body {
   min-width: 94px; text-align: center; flex-shrink: 0; letter-spacing: .02em;
 }
 .sp { flex: 1; }
-#vol-wrap { display: flex; align-items: center; gap: 4px; margin-right: 4px; flex-shrink: 0; }
+#vol-wrap { display: flex; align-items: center; gap: 4px; margin-right: 18px; }
 #vol-range {
   -webkit-appearance: none; appearance: none; width: 62px; height: 3px;
   background: rgba(255,255,255,.25); border-radius: 2px; outline: none; cursor: pointer;
-  flex-shrink: 1;
 }
 #vol-range::-webkit-slider-thumb {
   -webkit-appearance: none; width: 11px; height: 11px;
   border-radius: 50%; background: #fff;
-}
-/* Mobile: shrink volume slider so fs-btn always fits */
-@media (max-width: 480px) {
-  #vol-range { width: 44px; }
-  #vol-wrap { margin-right: 0; }
-  #ctrl-row { gap: 0; }
-  .cb { padding: 5px 6px; }
-  .cb.sm { padding: 5px 5px; font-size: 16px; }
-  #time-lbl { min-width: 78px; font-size: 10px; }
-}
-@media (max-width: 360px) {
-  #vol-range { width: 32px; }
-  #time-lbl { min-width: 66px; font-size: 9px; }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -526,16 +509,6 @@ body {
 .msg-time { font-size: 9px; color: var(--muted); padding: 0 3px; }
 
 /* Chat input */
-/* ── Typing indicator ── */
-#typing-indicator {
-  padding: 2px 14px 4px;
-  font-size: 10px; color: var(--accent);
-  font-style: italic; letter-spacing: .04em;
-  min-height: 18px; flex-shrink: 0;
-  opacity: 0; transition: opacity .25s;
-}
-#typing-indicator.on { opacity: 1; }
-
 #chat-inp-wrap {
   display: flex; align-items: flex-end; gap: 7px;
   padding: 8px 10px;
@@ -750,9 +723,6 @@ body {
     <!-- Messages -->
     <div id="msgs"></div>
 
-    <!-- Typing indicator -->
-    <div id="typing-indicator"></div>
-
     <!-- Input -->
     <div id="chat-inp-wrap">
       <textarea id="chat-ta" rows="1" placeholder="Сообщение…"></textarea>
@@ -817,7 +787,7 @@ function toast(msg, ms = 2500) {
 
 /* ─── State ───────────────────────────────────────── */
 let myName = '', roomId = '';
-let db_sync, db_chat, db_pres_me, db_typing;   // Firebase refs
+let db_sync, db_chat, db_pres_me;   // Firebase refs
 let isYT = false, ytPlayer = null;
 let drawerOpen = false, unread = 0;
 let suppressSync = false;
@@ -881,20 +851,6 @@ function tryEnter() {
   }).catch(() => {
     v.muted = false; // already unlocked or not needed
   });
-
-  // iOS: force repaint on orientation change to fix black screen in portrait
-  window.addEventListener('orientationchange', () => {
-    setTimeout(() => {
-      const pw = $('player-wrap');
-      pw.style.display = 'none';
-      // eslint-disable-next-line no-unused-expressions
-      pw.offsetHeight; // force reflow
-      pw.style.display = '';
-      if (!isYT && $('vid').src && $('vid').paused === false) {
-        $('vid').play().catch(() => {});
-      }
-    }, 350);
-  });
 }
 
 $('enter-btn').onclick = tryEnter;
@@ -908,7 +864,6 @@ function initFirebaseRefs() {
   db_sync   = ref(db, base + '/sync');
   db_chat   = ref(db, base + '/chat');
   db_pres_me= ref(db, base + '/pres/' + myName.replace(/[.#$/[\]]/g,'_'));
-  db_typing = ref(db, base + '/typing');
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -945,9 +900,6 @@ function loadMP4(src) {
   $('yt-wrap').classList.remove('on');
   $('ph').style.display = 'none';
   isYT = false;
-  // MP4 mode: show centre-btn and custom overlay fully
-  $('centre-btn').style.display = '';
-  $('yt-shield').style.pointerEvents = 'none';
   v.load();
   applyVtt();
   toast('Загружаю видео…');
@@ -960,9 +912,6 @@ function loadYT(id) {
   $('yt-wrap').classList.add('on');
   $('ph').style.display = 'none';
   isYT = true;
-  // YT mode: hide centre-btn (conflicts with YT UI), enable yt-shield for taps
-  $('centre-btn').style.display = 'none';
-  $('yt-shield').style.pointerEvents = 'all';
   // Load YT API if needed
   if (window.YT && window.YT.Player) { buildYT(id); return; }
   window.__ytCb = () => buildYT(id);
@@ -1141,30 +1090,6 @@ function initPlayer() {
     if (e.target.closest('#ctrl-bar')) return;
     if (e.target.closest('#centre-btn')) return;
 
-    // For YouTube: single tap = toggle play (no double-tap seek zones)
-    if (isYT) {
-      tapCount++;
-      if (tapCount === 1) {
-        tapTimer = setTimeout(() => {
-          tapCount = 0;
-          showCtrl();
-        }, 280);
-      } else if (tapCount >= 2) {
-        clearTimeout(tapTimer);
-        tapCount = 0;
-        // Double tap on YT: seek -10 / +10 same as MP4
-        const rect = $('player-wrap').getBoundingClientRect();
-        const relX = e.changedTouches[0].clientX - rect.left;
-        const w    = rect.width;
-        if (relX < w * 0.40) {
-          seekRel(-10); showCtrl(); showSeekFeedback(-10);
-        } else if (relX > w * 0.60) {
-          seekRel(+10); showCtrl(); showSeekFeedback(+10);
-        }
-      }
-      return;
-    }
-
     tapCount++;
     tapX = e.changedTouches[0].clientX;
 
@@ -1229,15 +1154,7 @@ function initPlayer() {
       showCtrl();
     })
   );
-  // iOS Safari fires webkitendfullscreen on the video element itself
-  $('vid').addEventListener('webkitendfullscreen', () => {
-    $('fs-btn').innerHTML = FS_ICON_ENTER;
-    showCtrl();
-  });
-  $('vid').addEventListener('webkitbeginfullscreen', () => {
-    $('fs-btn').innerHTML = FS_ICON_EXIT;
-    showCtrl();
-  });
+}
 
 /* Player helpers */
 function isPlaying() {
@@ -1343,30 +1260,12 @@ function showSeekFeedback(seconds) {
 
 /* Fullscreen */
 function toggleFS() {
-  const pw = $('player-wrap');
-  const v  = $('vid');
+  const el = $('player-wrap');
   const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
-
   if (!isFS) {
-    // For YouTube or desktop: fullscreen the player-wrap
-    if (isYT || !v || v.style.display === 'none') {
-      if (pw.requestFullscreen) pw.requestFullscreen();
-      else if (pw.webkitRequestFullscreen) pw.webkitRequestFullscreen();
-    } else {
-      // For MP4 on iOS Safari: webkitEnterFullscreen on the video element itself
-      if (pw.requestFullscreen) {
-        pw.requestFullscreen();
-      } else if (pw.webkitRequestFullscreen) {
-        pw.webkitRequestFullscreen();
-      } else if (v.webkitEnterFullscreen) {
-        // iOS Safari native video fullscreen
-        v.webkitEnterFullscreen();
-        return; // iOS handles fullscreenchange differently, no need to update icon here
-      }
-    }
+    (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
   } else {
-    if (document.exitFullscreen) document.exitFullscreen();
-    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
   }
 }
 
@@ -1519,35 +1418,6 @@ function initPresence() {
 function initChat() {
   const ta = $('chat-ta');
 
-  // ── Typing indicator ──
-  const myTypingKey = myName.replace(/[.#$/[\]]/g,'_');
-  let typingTimer;
-  function setTyping(active) {
-    set(ref(db, 'rooms/' + roomId + '/typing/' + myTypingKey), active ? myName : null)
-      .catch(() => {});
-  }
-  ta.addEventListener('focus', () => setTyping(true));
-  ta.addEventListener('blur',  () => setTyping(false));
-  ta.addEventListener('input', () => {
-    setTyping(true);
-    clearTimeout(typingTimer);
-    typingTimer = setTimeout(() => setTyping(false), 3000);
-  });
-  // Listen to others typing
-  onValue(db_typing, snap => {
-    const data = snap.val() || {};
-    const others = Object.entries(data)
-      .filter(([k, v]) => v && k !== myTypingKey)
-      .map(([, v]) => v);
-    const ind = $('typing-indicator');
-    if (others.length) {
-      ind.textContent = others.join(', ') + ' печатает…';
-      ind.classList.add('on');
-    } else {
-      ind.classList.remove('on');
-    }
-  });
-
   // Send on button click
   $('send-btn').onclick = sendMsg;
 
@@ -1609,10 +1479,6 @@ function sendMsg() {
   const ta   = $('chat-ta');
   const text = ta.value.trim();
   if (!text) return;
-
-  // Clear typing indicator
-  const myTypingKey = myName.replace(/[.#$/[\]]/g,'_');
-  set(ref(db, 'rooms/' + roomId + '/typing/' + myTypingKey), null).catch(() => {});
 
   push(db_chat, { type:'msg', text, name:myName, ts: serverTimestamp() })
     .catch(e => { toast('Ошибка отправки ✕'); console.error('send error:', e); });
