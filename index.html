@@ -313,11 +313,16 @@ body {
     transparent 65%
   );
   transition: opacity .3s;
-  pointer-events: none; /* children will opt-in */
+  /* Overlay itself never captures events — only children opt-in */
+  pointer-events: none;
 }
+/* HIDDEN: nothing inside overlay is clickable — first touch only shows UI */
 #ctrl-overlay.hidden { opacity: 0; }
-#ctrl-overlay.hidden #ctrl-bar { pointer-events: none; }
+#ctrl-overlay.hidden * { pointer-events: none !important; }
+
+/* VISIBLE: ctrl-bar and centre-btn are interactive */
 #ctrl-overlay:not(.hidden) #ctrl-bar { pointer-events: all; }
+#ctrl-overlay:not(.hidden) #centre-btn { pointer-events: all; }
 
 /* Centre play/pause button — synced visibility with ctrl-overlay */
 #centre-btn {
@@ -333,14 +338,14 @@ body {
   -webkit-backdrop-filter: blur(10px);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
-  pointer-events: all;
+  /* pointer-events controlled by parent .hidden rule above */
+  pointer-events: none;
   transition: opacity .3s, transform .15s, background .15s;
   -webkit-user-select: none; user-select: none;
   -webkit-appearance: none; appearance: none;
 }
 #centre-btn:hover { background: rgba(0,0,0,.7); border-color: rgba(255,255,255,.45); }
 #centre-btn:active { transform: translate(-50%, -50%) scale(.88); }
-#ctrl-overlay.hidden #centre-btn { pointer-events: none; }
 
 /* Sync + user pills */
 #sync-pill {
@@ -400,20 +405,20 @@ body {
 }
 .cb {
   background: none; border: none; color: rgba(255,255,255,.88);
-  font-size: 20px; cursor: pointer; padding: 5px 8px;
+  font-size: 23px; cursor: pointer; padding: 5px 9px;
   border-radius: 7px; line-height: 1; flex-shrink: 0;
   -webkit-user-select: none; user-select: none; -webkit-appearance: none;
   transition: color .12s, background .12s;
 }
 .cb:hover { color: #fff; background: rgba(255,255,255,.1); }
 .cb:active { transform: scale(.86); }
-.cb.sm { font-size: 16px; }
+.cb.sm { font-size: 18px; }
 #time-lbl {
   font-size: 11px; color: rgba(255,255,255,.55);
   min-width: 94px; text-align: center; flex-shrink: 0; letter-spacing: .02em;
 }
 .sp { flex: 1; }
-#vol-wrap { display: flex; align-items: center; gap: 4px; }
+#vol-wrap { display: flex; align-items: center; gap: 4px; margin-right: 18px; }
 #vol-range {
   -webkit-appearance: none; appearance: none; width: 62px; height: 3px;
   background: rgba(255,255,255,.25); border-radius: 2px; outline: none; cursor: pointer;
@@ -1036,31 +1041,53 @@ function initPlayer() {
   /* Fullscreen */
   $('fs-btn').onclick = e => { e.stopPropagation(); toggleFS(); };
 
-  /* ── Desktop: click anywhere on video = play/pause ── */
+  /* ── Desktop: click anywhere on video = play/pause ──
+     On touch devices 'click' fires after touchend — we must ignore it
+     there to prevent ghost pauses. Only real mouse clicks count.
+  ── */
   $('player-wrap').addEventListener('click', e => {
+    if (isTouchDevice()) return;            // mobile: never pause via click
     if (e.target.closest('#ctrl-bar'))   return;
-    if (e.target.closest('#centre-btn')) return; // has own handler
+    if (e.target.closest('#centre-btn')) return;
     if (e.target.closest('#sync-pill'))  return;
     if (e.target.closest('#user-pill'))  return;
     if (e.target.closest('#yt-shield'))  return;
-    if (window.innerWidth >= 768) {
-      togglePlay(); pushSync(); showCtrl();
-    }
-    // Mobile: handled by touchend
+    togglePlay(); pushSync(); showCtrl();
   });
 
-  /* ── Mobile tap handling ────────────────────────────────
-     Single tap  → show/reset controls (NO pause)
+  /* ── Mobile tap handling ─────────────────────────────────────────
+     PRINCIPLE: "First touch shows UI only — never triggers actions"
+     
+     touchstart → immediately show controls (finger-down = instant UI)
+     touchend   → count taps for double-tap detection
+     
+     Single tap (after 280ms debounce):
+       → If panel was hidden: already shown by touchstart, reset timer
+       → If panel was visible: reset the 2.5s hide timer (keep visible)
+       → NEVER pauses video on mobile
+     
      Double tap:
-       Left 45%  → seek −10s
-       Right 45% → seek +10s
-       Centre 10%→ ignored
-  ────────────────────────────────────────────────────── */
+       Left 40%   → seek −10s
+       Right 40%  → seek +10s
+       Centre 20% → ignored (safe zone)
+  ────────────────────────────────────────────────────────────────── */
   let tapTimer = null, tapCount = 0, tapX = 0;
-  $('player-wrap').addEventListener('touchend', e => {
-    // Ignore taps directly on ctrl-bar buttons (they have their own handlers)
+
+  // touchstart: show controls immediately on any finger-down
+  // This is the "first touch shows UI" mechanism — the panel appears
+  // the instant the finger touches the screen, not on release.
+  $('player-wrap').addEventListener('touchstart', e => {
+    // Don't interfere with ctrl-bar or centre-btn interactions
     if (e.target.closest('#ctrl-bar')) return;
-    // Also ignore centre-btn — it has its own onclick
+    if (e.target.closest('#centre-btn')) return;
+    // Show controls immediately, reset auto-hide timer
+    showCtrl();
+  }, { passive: true });
+
+  $('player-wrap').addEventListener('touchend', e => {
+    // ctrl-bar and centre-btn have their own handlers (and are blocked by
+    // CSS pointer-events:none when panel is hidden — so this is safe)
+    if (e.target.closest('#ctrl-bar')) return;
     if (e.target.closest('#centre-btn')) return;
 
     tapCount++;
@@ -1069,22 +1096,23 @@ function initPlayer() {
     if (tapCount === 1) {
       tapTimer = setTimeout(() => {
         tapCount = 0;
-        // Single tap: toggle controls visibility, NO play/pause
-        ctrlVisible ? hideCtrl() : showCtrl();
+        // Single tap resolved: panel is already visible (shown on touchstart).
+        // Just reset the timer — showCtrl() does exactly that.
+        showCtrl();
       }, 280);
     } else if (tapCount >= 2) {
       clearTimeout(tapTimer);
       tapCount = 0;
       const rect = $('player-wrap').getBoundingClientRect();
-      const w    = rect.width;
       const relX = tapX - rect.left;
-      // Zones: left 45% | centre 10% | right 45%
-      if (relX < w * 0.45) {
+      const w    = rect.width;
+      // Double-tap zones: 40% | 20% (ignored) | 40%
+      if (relX < w * 0.40) {
         seekRel(-10); showCtrl(); showSeekFeedback(-10);
-      } else if (relX > w * 0.55) {
+      } else if (relX > w * 0.60) {
         seekRel(+10); showCtrl(); showSeekFeedback(+10);
       }
-      // Centre 10% → intentionally ignored
+      // Centre 20% → intentionally no action
     }
   }, { passive: true });
 
@@ -1177,21 +1205,27 @@ function fmt(s) {
   return m + ':' + String(ss).padStart(2,'0');
 }
 
-/* Controls visibility */
+/* ── Controls visibility ─────────────────────────────────────────────
+   Desktop (no touch): controls always visible, auto-hide only in FS.
+   Touch device (mobile/tablet): always auto-hide after CTRL_TIMEOUT.
+   showCtrl() is safe to call repeatedly — it always restarts the timer.
+────────────────────────────────────────────────────────────────────── */
+const isTouchDevice = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
 function showCtrl() {
   ctrlVisible = true;
   $('ctrl-overlay').classList.remove('hidden');
   clearTimeout(ctrlHideTimer);
   const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
-  // Auto-hide only in fullscreen, or on mobile always
-  if (isFS || window.innerWidth < 768) {
+  // Auto-hide on: any fullscreen mode, OR any touch device
+  if (isFS || isTouchDevice()) {
     ctrlHideTimer = setTimeout(hideCtrl, CTRL_TIMEOUT);
   }
 }
 function hideCtrl() {
-  // Desktop outside FS: always keep controls visible
   const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
-  if (!isFS && window.innerWidth >= 768) return;
+  // Keep visible on desktop outside fullscreen
+  if (!isFS && !isTouchDevice()) return;
   ctrlVisible = false;
   $('ctrl-overlay').classList.add('hidden');
 }
