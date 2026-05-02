@@ -319,6 +319,29 @@ body {
 #ctrl-overlay.hidden #ctrl-bar { pointer-events: none; }
 #ctrl-overlay:not(.hidden) #ctrl-bar { pointer-events: all; }
 
+/* Centre play/pause button — synced visibility with ctrl-overlay */
+#centre-btn {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.52);
+  border: 2px solid rgba(255,255,255,.25);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  pointer-events: all;
+  transition: opacity .3s, transform .15s, background .15s;
+  -webkit-user-select: none; user-select: none;
+  -webkit-appearance: none; appearance: none;
+}
+#centre-btn:hover { background: rgba(0,0,0,.7); border-color: rgba(255,255,255,.45); }
+#centre-btn:active { transform: translate(-50%, -50%) scale(.88); }
+#ctrl-overlay.hidden #centre-btn { pointer-events: none; }
+
 /* Sync + user pills */
 #sync-pill {
   position: absolute; top: 10px; left: 10px; z-index: 11;
@@ -377,14 +400,14 @@ body {
 }
 .cb {
   background: none; border: none; color: rgba(255,255,255,.88);
-  font-size: 17px; cursor: pointer; padding: 5px 7px;
+  font-size: 20px; cursor: pointer; padding: 5px 8px;
   border-radius: 7px; line-height: 1; flex-shrink: 0;
   -webkit-user-select: none; user-select: none; -webkit-appearance: none;
   transition: color .12s, background .12s;
 }
 .cb:hover { color: #fff; background: rgba(255,255,255,.1); }
 .cb:active { transform: scale(.86); }
-.cb.sm { font-size: 14px; }
+.cb.sm { font-size: 16px; }
 #time-lbl {
   font-size: 11px; color: rgba(255,255,255,.55);
   min-width: 94px; text-align: center; flex-shrink: 0; letter-spacing: .02em;
@@ -621,6 +644,12 @@ body {
 
       <!-- Controls overlay -->
       <div id="ctrl-overlay">
+        <!-- Centre play/pause button -->
+        <button id="centre-btn" aria-label="Воспроизведение / Пауза">
+          <svg id="centre-icon" width="26" height="26" viewBox="0 0 24 24" fill="white">
+            <polygon points="5,3 19,12 5,21" />
+          </svg>
+        </button>
         <div id="ctrl-bar">
           <div id="prog-wrap">
             <div id="prog-track">
@@ -725,7 +754,7 @@ const FB_CONFIG = {
 };
 const PASSWORD = 'love123';
 const SYNC_DRIFT   = 2.5;   // seconds before force-seek
-const CTRL_TIMEOUT = 3500;  // ms before controls auto-hide (fullscreen)
+const CTRL_TIMEOUT = 2500;  // ms before controls auto-hide
 const HB_INTERVAL  = 5000;  // heartbeat ms
 
 /* ─── Firebase init ───────────────────────────────── */
@@ -915,8 +944,7 @@ function buildYT(id) {
         toast('YouTube готов ✓');
       },
       onStateChange(e) {
-        $('play-btn').textContent =
-          e.data === YT.PlayerState.PLAYING ? '⏸' : '▶';
+        syncPlayIcon(e.data === YT.PlayerState.PLAYING);
         if (!suppressSync) pushSync();
       }
     }
@@ -949,8 +977,11 @@ function initPlayer() {
   const pw  = $('prog-wrap');
   const vol = $('vol-range');
 
-  /* Play / Pause button */
+  /* Play / Pause button (bottom bar) */
   $('play-btn').onclick = e => { e.stopPropagation(); togglePlay(); pushSync(); };
+
+  /* Centre play/pause button */
+  $('centre-btn').onclick = e => { e.stopPropagation(); togglePlay(); pushSync(); showCtrl(); };
 
   /* YT tap shield — intercept clicks on YT iframe */
   $('yt-shield').onclick = e => { e.stopPropagation(); togglePlay(); pushSync(); showCtrl(); };
@@ -1005,57 +1036,72 @@ function initPlayer() {
   /* Fullscreen */
   $('fs-btn').onclick = e => { e.stopPropagation(); toggleFS(); };
 
-  /* ── Desktop: click on video area = play/pause + show controls ── */
+  /* ── Desktop: click anywhere on video = play/pause ── */
   $('player-wrap').addEventListener('click', e => {
-    if (e.target.closest('#ctrl-bar')) return;
-    if (e.target.closest('#sync-pill')) return;
-    if (e.target.closest('#user-pill')) return;
-    if (e.target.closest('#yt-shield')) return; // YT shield handles its own click
+    if (e.target.closest('#ctrl-bar'))   return;
+    if (e.target.closest('#centre-btn')) return; // has own handler
+    if (e.target.closest('#sync-pill'))  return;
+    if (e.target.closest('#user-pill'))  return;
+    if (e.target.closest('#yt-shield'))  return;
     if (window.innerWidth >= 768) {
-      // Desktop: click = always play/pause, always show controls
       togglePlay(); pushSync(); showCtrl();
     }
-    // Mobile single/double tap handled by touchend above
+    // Mobile: handled by touchend
   });
 
-  /* ── Mobile: tap = show controls, double-tap left third / right third to seek ── */
+  /* ── Mobile tap handling ────────────────────────────────
+     Single tap  → show/reset controls (NO pause)
+     Double tap:
+       Left 45%  → seek −10s
+       Right 45% → seek +10s
+       Centre 10%→ ignored
+  ────────────────────────────────────────────────────── */
   let tapTimer = null, tapCount = 0, tapX = 0;
   $('player-wrap').addEventListener('touchend', e => {
-    // Ignore taps on controls bar to avoid conflicts
+    // Ignore taps directly on ctrl-bar buttons (they have their own handlers)
     if (e.target.closest('#ctrl-bar')) return;
+    // Also ignore centre-btn — it has its own onclick
+    if (e.target.closest('#centre-btn')) return;
+
     tapCount++;
     tapX = e.changedTouches[0].clientX;
 
     if (tapCount === 1) {
       tapTimer = setTimeout(() => {
         tapCount = 0;
-        // Single tap: always show controls (reset auto-hide timer via showCtrl)
-        showCtrl();
-      }, 270);
+        // Single tap: toggle controls visibility, NO play/pause
+        ctrlVisible ? hideCtrl() : showCtrl();
+      }, 280);
     } else if (tapCount >= 2) {
       clearTimeout(tapTimer);
       tapCount = 0;
       const rect = $('player-wrap').getBoundingClientRect();
-      const third = rect.width / 3;
-      const relX  = tapX - rect.left;
-      if (relX < third) {
-        // Left third → rewind
+      const w    = rect.width;
+      const relX = tapX - rect.left;
+      // Zones: left 45% | centre 10% | right 45%
+      if (relX < w * 0.45) {
         seekRel(-10); showCtrl(); showSeekFeedback(-10);
-      } else if (relX > third * 2) {
-        // Right third → forward
+      } else if (relX > w * 0.55) {
         seekRel(+10); showCtrl(); showSeekFeedback(+10);
-      } else {
-        // Centre → play/pause
-        togglePlay(); pushSync(); showCtrl();
       }
+      // Centre 10% → intentionally ignored
     }
   }, { passive: true });
 
   $('player-wrap').addEventListener('mousemove', showCtrl);
 
   /* ── Video element events ── */
-  v.addEventListener('play',           () => $('play-btn').textContent = '⏸');
-  v.addEventListener('pause',          () => $('play-btn').textContent = '▶');
+  function syncPlayIcon(playing) {
+    $('play-btn').textContent = playing ? '⏸' : '▶';
+    const svg = $('centre-icon');
+    if (svg) {
+      svg.innerHTML = playing
+        ? '<rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/>'
+        : '<polygon points="5,3 19,12 5,21"/>';
+    }
+  }
+  v.addEventListener('play',  () => syncPlayIcon(true));
+  v.addEventListener('pause', () => syncPlayIcon(false));
   v.addEventListener('timeupdate',     updateProg);
   v.addEventListener('durationchange', updateProg);
   v.addEventListener('waiting',        () => setSS('warn','Буферизация…'));
