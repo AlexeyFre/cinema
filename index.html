@@ -2,11 +2,11 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <!-- Отключаем зум для корректной работы приложения на мобильных устройствах -->
+    <!-- Использование dvh и запрет масштабирования спасают макет при открытии клавиатуры на iOS/Android -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Кино для двоих 🍿</title>
 
-    <!-- Firebase (Ваши настройки) -->
+    <!-- Подключение Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <!-- YouTube IFrame API -->
@@ -14,248 +14,296 @@
 
     <style>
         /* ==========================================
-           БАЗОВЫЕ СТИЛИ & ПЕРЕМЕННЫЕ
+           ГЛОБАЛЬНЫЙ СБРОС И БАЗОВЫЕ СТИЛИ
            ========================================== */
-        :root {
-            --bg-color: #050505;
-            --panel-bg: #111111;
-            --primary: #E50914;
-            --primary-hover: #b20710;
-            --text: #f1f1f1;
-            --text-muted: #aaaaaa;
-            --border: #333333;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg-deep: #000000;
+            --bg-card: #1a1a1a;
+            --bg-input: #2a2a2a;
+            --primary: #E50914;
+            --text-main: #ffffff;
+            --text-muted: #888888;
+            --border-color: #333333;
+        }
 
         html, body {
-            width: 100%; height: 100%; 
-            background-color: var(--bg-color); color: var(--text);
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            overflow: hidden; /* Строго без скролла на странице */
-            overscroll-behavior-y: none; /* Защита от Pull-to-refresh */
+            width: 100vw;
+            height: 100dvh; /* Используем dVH для фикса бага с клавиатурой */
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden; /* Запрещаем скролл страницы */
         }
 
-        /* Утилиты */
-        .btn {
-            background: var(--primary); color: white; border: none; padding: 10px 16px;
-            border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s;
-            font-size: 14px; white-space: nowrap;
+        button {
+            cursor: pointer;
+            border: none;
+            outline: none;
+            font-family: inherit;
         }
-        .btn:hover { background: var(--primary-hover); }
-        .btn-secondary { background: #333; }
-        .btn-secondary:hover { background: #444; }
-        
-        input[type="text"], input[type="password"] {
-            background: #222; color: white; border: 1px solid var(--border);
-            padding: 12px; border-radius: 6px; outline: none; font-size: 15px;
+
+        input {
+            font-family: inherit;
+            outline: none;
         }
-        input[type="text"]:focus, input[type="password"]:focus { border-color: var(--primary); }
 
         /* ==========================================
            ЭКРАН АВТОРИЗАЦИИ
            ========================================== */
         #login-screen {
-            position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-            background: radial-gradient(circle, #1a1a1a 0%, #000 100%); z-index: 9999;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100dvh;
+            background: var(--bg-deep);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
         }
-        .login-box {
-            background: rgba(20, 20, 20, 0.9); padding: 40px; border-radius: 12px;
-            border: 1px solid var(--border); width: 90%; max-width: 360px; text-align: center;
-            backdrop-filter: blur(10px);
+
+        .login-card {
+            background: var(--bg-card);
+            padding: 40px 30px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 380px;
+            text-align: center;
+            border: 1px solid var(--border-color);
         }
-        .login-box h1 { margin-bottom: 24px; font-weight: 400; }
-        .login-box input { width: 100%; margin-bottom: 16px; }
-        .login-box .btn { width: 100%; font-size: 16px; padding: 14px; }
+
+        .login-card h1 { margin-bottom: 25px; font-size: 24px; font-weight: 600; }
+        .login-card input {
+            width: 100%; padding: 14px; margin-bottom: 15px;
+            background: var(--bg-deep); color: var(--text-main);
+            border: 1px solid var(--border-color); border-radius: 8px; font-size: 16px;
+        }
+        .login-card input:focus { border-color: var(--primary); }
+        .btn-main {
+            width: 100%; padding: 14px; background: var(--primary); color: white;
+            border-radius: 8px; font-size: 16px; font-weight: bold; transition: background 0.2s;
+        }
+        .btn-main:hover { background: #b20710; }
 
         /* ==========================================
-           ГЛАВНЫЙ МАКЕТ АППЛИКАЦИИ
+           ГЛАВНЫЙ МАКЕТ (СЕТКА)
            ========================================== */
-        #app-container {
-            display: none; height: 100%; width: 100%;
+        #app-wrapper {
+            display: none; /* Скрыто до логина */
+            width: 100vw;
+            height: 100dvh;
+            flex-direction: column; /* По умолчанию мобильный вид (Вертикальный) */
         }
 
-        /* Зона с видео (включает панель управления) */
-        #video-zone {
-            flex: 1; display: flex; flex-direction: column; position: relative; background: #000;
+        /* ----------------------------------
+           СЕКЦИЯ ВИДЕО
+           ---------------------------------- */
+        #video-section {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-deep);
+            flex-shrink: 0;
+            width: 100%;
         }
 
-        /* Панель управления */
-        #controls {
-            display: flex; gap: 10px; padding: 15px; background: var(--panel-bg);
-            border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; z-index: 10;
+        /* ПАНЕЛЬ УПРАВЛЕНИЯ */
+        #controls-panel {
+            display: flex;
+            gap: 8px;
+            padding: 10px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            align-items: center;
         }
-        #controls input[type="text"] { flex: 1; min-width: 200px; padding: 10px; }
-        .file-label {
-            background: #222; border: 1px solid var(--border); padding: 10px 15px;
-            border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;
-        }
-        .file-label:hover { background: #333; }
-        .file-label input { display: none; }
 
-        /* Контейнер плеера */
-        #player-wrapper {
-            flex: 1; position: relative; display: flex; align-items: center; justify-content: center;
-            background: black; overflow: hidden;
+        #video-url-input {
+            flex-grow: 1;
+            min-width: 100px;
+            padding: 10px;
+            background: var(--bg-input);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
         }
-        #html5-player { width: 100%; height: 100%; object-fit: contain; }
-        #yt-player { width: 100%; height: 100%; display: none; pointer-events: auto; }
+
+        .btn-small {
+            background: var(--primary); color: white; padding: 10px 15px;
+            border-radius: 6px; font-size: 14px; font-weight: 600; white-space: nowrap;
+        }
+
+        .btn-secondary {
+            background: var(--bg-input); border: 1px solid var(--border-color);
+        }
+
+        /* КОНТЕЙНЕР ПЛЕЕРА */
+        #player-container {
+            width: 100%;
+            background: #000;
+            position: relative;
+            /* Мобильные пропорции 16:9 */
+            aspect-ratio: 16 / 9; 
+        }
+
+        #html5-player {
+            width: 100%; height: 100%; object-fit: contain; display: block;
+        }
+
+        #yt-player {
+            width: 100%; height: 100%; display: none; border: none;
+        }
+
+        /* ----------------------------------
+           СЕКЦИЯ ЧАТА
+           ---------------------------------- */
+        #chat-section {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            min-height: 0; /* ВАЖНО для правильного скролла во Flexbox */
+            background: var(--bg-deep);
+            border-top: 1px solid var(--border-color);
+        }
+
+        #chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: var(--bg-deep);
+        }
+
+        .msg-container {
+            display: flex;
+            flex-direction: column;
+            max-width: 85%;
+        }
+
+        .msg-container.my-msg { align-self: flex-end; }
+        .msg-container.other-msg { align-self: flex-start; }
+
+        .msg-name {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            margin-left: 4px;
+            margin-right: 4px;
+        }
+        .my-msg .msg-name { text-align: right; }
+
+        .msg-bubble {
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .my-msg .msg-bubble { background: var(--primary); color: white; border-bottom-right-radius: 2px; }
+        .other-msg .msg-bubble { background: var(--bg-card); color: var(--text-main); border-bottom-left-radius: 2px; border: 1px solid var(--border-color); }
+
+        #chat-input-area {
+            display: flex;
+            padding: 12px;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-color);
+            gap: 10px;
+        }
+
+        #chat-input {
+            flex-grow: 1;
+            padding: 12px 16px;
+            border-radius: 24px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-input);
+            color: white;
+            font-size: 15px;
+        }
+
+        #chat-send-btn {
+            background: var(--primary); color: white; border-radius: 50%;
+            width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+            font-size: 18px; flex-shrink: 0;
+        }
+
+        input[type="file"] { display: none; }
 
         /* ==========================================
-           ЧАТ-ЗОНА И ОВЕРЛЕЙ
+           МЕДИАЗАПРОС ДЛЯ ПК И ПЛАНШЕТОВ (Горизонтальный вид)
            ========================================== */
-        #chat-zone {
-            display: flex; flex-direction: column; background: var(--panel-bg);
-            border-left: 1px solid var(--border); transition: all 0.3s ease;
-        }
-        
-        .chat-header {
-            display: none; justify-content: space-between; align-items: center;
-            padding: 12px 16px; background: rgba(0,0,0,0.6); border-bottom: 1px solid var(--border);
-            font-weight: bold; border-radius: 12px 12px 0 0;
-        }
-        .chat-close { cursor: pointer; font-size: 24px; color: var(--text-muted); line-height: 1; border: none; background: transparent;}
-        .chat-close:hover { color: white; }
-
-        #messages {
-            flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
-            overscroll-behavior-y: contain; /* Прокрутка только внутри чата */
-        }
-        .msg { max-width: 85%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
-        .msg.my-msg { background: var(--primary); align-self: flex-end; border-bottom-right-radius: 2px; }
-        .msg.other-msg { background: #2a2a2a; align-self: flex-start; border-bottom-left-radius: 2px; }
-        .msg-name { font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
-
-        #chat-input-wrapper {
-            display: flex; padding: 12px; border-top: 1px solid var(--border); background: #1a1a1a;
-        }
-        #chat-input-wrapper input { flex: 1; margin-right: 8px; border-radius: 20px; padding: 10px 16px; }
-        #chat-input-wrapper .btn { border-radius: 20px; padding: 10px 18px; }
-
-        /* ==========================================
-           ПЛАВАЮЩАЯ КНОПКА (Скрыта на ПК и в вертикальном режиме по умолчанию)
-           ========================================== */
-        #chat-float-btn {
-            display: none; position: absolute; bottom: 40px; right: 40px;
-            width: 64px; height: 64px; border-radius: 50%; background: rgba(30, 30, 30, 0.85);
-            border: 2px solid var(--border); color: white; font-size: 28px;
-            align-items: center; justify-content: center; cursor: pointer;
-            backdrop-filter: blur(10px); box-shadow: 0 5px 20px rgba(0,0,0,0.8);
-            z-index: 1000; user-select: none; touch-action: none; pointer-events: auto;
-            transition: transform 0.1s;
-        }
-        #chat-float-btn:active { transform: scale(0.95); }
-        #chat-badge {
-            position: absolute; top: 0; right: 0; width: 16px; height: 16px;
-            background: var(--primary); border-radius: 50%; display: none; border: 2px solid #222;
-        }
-
-        /* ==========================================
-           АДАПТИВНОСТЬ (3 РЕЖИМА)
-           ========================================== */
-        
-        /* 1. ПК (Desktop) */
-        @media (min-width: 900px) {
-            #app-container { flex-direction: row; }
-            #chat-zone { width: 350px; height: 100%; border-top: none; }
-        }
-
-        /* 2. Мобильный Вертикальный (Portrait) */
-        @media (max-width: 899px) and (orientation: portrait) {
-            #app-container { flex-direction: column; }
-            #chat-zone { width: 100%; flex: 1; border-left: none; border-top: 1px solid var(--border); }
-        }
-
-        /* 3. Мобильный Горизонтальный (Landscape) + Нативный Fullscreen */
-        @media (max-width: 899px) and (orientation: landscape) {
-            #controls { display: none; } /* Прячем верхнюю панель управления */
-            #chat-float-btn { display: flex; } /* Показываем плавающую кнопку */
-            
-            /* Превращаем чат в оверлей */
-            #chat-zone {
-                display: none; position: absolute; bottom: 20px; right: 90px;
-                width: 320px; height: 75vh; border-radius: 12px; border: 1px solid var(--border);
-                background: rgba(15, 15, 15, 0.9); backdrop-filter: blur(15px);
-                z-index: 1500; box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+        @media (min-width: 768px) and (orientation: landscape) {
+            #app-wrapper {
+                flex-direction: row; /* Видео слева, чат справа */
             }
-            #chat-zone.show-overlay { display: flex; }
-            .chat-header { display: flex; }
-            #chat-input-wrapper { background: rgba(0,0,0,0.5); border-radius: 0 0 12px 12px; }
-        }
 
-        /* ПОЛНОЭКРАННЫЙ РЕЖИМ (CSS API) */
-        :fullscreen #controls { display: none !important; }
-        :-webkit-full-screen #controls { display: none !important; }
-        :fullscreen #chat-zone:not(.show-overlay) { display: none; }
-        :-webkit-full-screen #chat-zone:not(.show-overlay) { display: none; }
-        
-        /* Принудительное включение оверлей-чата при Fullscreen на ПК */
-        :fullscreen #chat-float-btn { display: flex; }
-        :-webkit-full-screen #chat-float-btn { display: flex; }
-        
-        :fullscreen #chat-zone.show-overlay {
-            position: absolute; bottom: 100px; right: 40px; width: 350px; height: 60vh;
-            border-radius: 12px; background: rgba(15,15,15,0.9); z-index: 1500; border: 1px solid #444;
-        }
-        :-webkit-full-screen #chat-zone.show-overlay {
-            position: absolute; bottom: 100px; right: 40px; width: 350px; height: 60vh;
-            border-radius: 12px; background: rgba(15,15,15,0.9); z-index: 1500; border: 1px solid #444;
-        }
-        :fullscreen .chat-header { display: flex; }
-        :-webkit-full-screen .chat-header { display: flex; }
+            #video-section {
+                flex-grow: 1;
+                width: 70%;
+                height: 100dvh;
+            }
 
+            #player-container {
+                aspect-ratio: auto;
+                flex-grow: 1; /* Занимает всю оставшуюся высоту под контролами */
+            }
+
+            #chat-section {
+                width: 30%;
+                min-width: 320px;
+                max-width: 450px;
+                height: 100dvh;
+                border-top: none;
+                border-left: 1px solid var(--border-color);
+            }
+        }
     </style>
 </head>
 <body>
 
-    <!-- ЭКРАН ЛОГИНА -->
+    <!-- ЭКРАН ВХОДА -->
     <div id="login-screen">
-        <div class="login-box">
+        <div class="login-card">
             <h1>Кино для двоих 🍿</h1>
-            <input type="text" id="username" placeholder="Ваше имя (Зайка)">
-            <input type="password" id="password" placeholder="Секретный пароль">
-            <button class="btn" onclick="app.login()">Войти</button>
+            <input type="text" id="username" placeholder="Ваше имя (например, Зайка)">
+            <input type="password" id="password" placeholder="Пароль">
+            <button class="btn-main" onclick="app.login()">Войти</button>
         </div>
     </div>
 
-    <!-- ГЛАВНОЕ ПРИЛОЖЕНИЕ -->
-    <div id="app-container">
+    <!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
+    <div id="app-wrapper">
         
-        <!-- Секция Видео -->
-        <div id="video-zone">
-            <!-- Панель управления -->
-            <div id="controls">
-                <input type="text" id="video-url" placeholder="Вставьте ссылку на видео (.mp4 или YouTube)">
-                <button class="btn" onclick="app.loadVideo()">Загрузить</button>
-                <label class="file-label">
-                    + Субтитры (.vtt)
+        <!-- ЛЕВАЯ ЧАСТЬ (ИЛИ ВЕРХНЯЯ НА МОБИЛЬНЫХ) - ВИДЕО -->
+        <div id="video-section">
+            <div id="controls-panel">
+                <input type="text" id="video-url-input" placeholder="Ссылка на YouTube или .mp4">
+                <button class="btn-small" onclick="app.loadVideo()">Загрузить</button>
+                <label class="btn-small btn-secondary" style="cursor: pointer;">
+                    + Субтитры
                     <input type="file" accept=".vtt" id="subtitles-input" onchange="app.loadSubtitles(event)">
                 </label>
-                <button class="btn btn-secondary" onclick="app.toggleFullscreen()">На весь экран</button>
             </div>
-
-            <!-- Плеер -->
-            <div id="player-wrapper">
+            
+            <div id="player-container">
+                <!-- Стандартный HTML5 плеер (у него есть своя нативная кнопка Fullscreen) -->
                 <video id="html5-player" playsinline controls></video>
+                <!-- Контейнер для YouTube Iframe (у него тоже есть своя нативная кнопка Fullscreen) -->
                 <div id="yt-player"></div>
-                
-                <!-- Плавающая кнопка чата (внутри video-zone для Fullscreen) -->
-                <div id="chat-float-btn">
-                    💬<div id="chat-badge"></div>
-                </div>
+            </div>
+        </div>
 
-                <!-- Чат (перемещается сюда визуально через CSS position: absolute) -->
-                <div id="chat-zone">
-                    <div class="chat-header">
-                        <span>Чат</span>
-                        <button class="chat-close" onclick="app.toggleChatOverlay()">×</button>
-                    </div>
-                    <div id="messages"></div>
-                    <div id="chat-input-wrapper">
-                        <input type="text" id="chat-input" placeholder="Написать..." onkeypress="app.handleChatEnter(event)">
-                        <button class="btn" onclick="app.sendMessage()">➤</button>
-                    </div>
-                </div>
+        <!-- ПРАВАЯ ЧАСТЬ (ИЛИ НИЖНЯЯ НА МОБИЛЬНЫХ) - ЧАТ -->
+        <div id="chat-section">
+            <div id="chat-messages"></div>
+            <div id="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Написать сообщение..." onkeypress="app.handleChatKey(event)">
+                <button id="chat-send-btn" onclick="app.sendMessage()">➤</button>
             </div>
         </div>
 
@@ -263,12 +311,11 @@
 
     <script>
         /**
-         * АРХИТЕКТУРА И ЛОГИКА
-         * Использован паттерн Namespace, чтобы не засорять глобальную область.
+         * ГЛАВНЫЙ ОБЪЕКТ ПРИЛОЖЕНИЯ
+         * Инкапсулируем всю логику для чистоты кода и избежания конфликтов.
          */
         const app = {
-            // Настройки
-            PASSWORD: "love123",
+            // КОНФИГУРАЦИЯ FIREBASE
             firebaseConfig: {
                 apiKey: "AIzaSyBatXdgIXXW5c4VFibd24bhoAockReJPrE",
                 authDomain: "our-cinema-20c0f.firebaseapp.com",
@@ -279,363 +326,350 @@
                 appId: "1:970156344935:web:74ecce58fb40f4579636c2"
             },
             
-            // Состояние
-            user: "Аноним",
-            clientId: Math.random().toString(36).substring(2, 15),
-            activeMode: 'html5', // 'html5' | 'youtube'
-            isYtReady: false,
-            ytPlayer: null,
+            // СОСТОЯНИЕ
+            password: "love123", // Пароль
+            username: "Аноним",
+            clientId: Math.random().toString(36).substr(2, 9), // Уникальный ID сессии
+            currentMode: 'html5', // 'html5' или 'youtube'
             
-            // Синхронизация (Защита от зацикливания)
-            syncLockTime: 0, // Время, до которого игнорируем входящие события из Firebase
-            lastKnownState: null,
-            
-            // Элементы DOM
-            els: {},
+            // Флаги синхронизации
+            isApplyingRemoteSync: false,
+            syncInterval: null,
 
+            // ЭЛЕМЕНТЫ DOM
+            ui: {},
+
+            // ИНИЦИАЛИЗАЦИЯ
             init() {
-                firebase.initializeApp(this.firebaseConfig);
+                // Подключаем элементы
+                this.ui.loginScreen = document.getElementById('login-screen');
+                this.ui.appWrapper = document.getElementById('app-wrapper');
+                this.ui.htmlPlayer = document.getElementById('html5-player');
+                this.ui.ytPlayerContainer = document.getElementById('yt-player');
+                this.ui.urlInput = document.getElementById('video-url-input');
+                this.ui.chatMessages = document.getElementById('chat-messages');
+                this.ui.chatInput = document.getElementById('chat-input');
+
+                // Инициализация Firebase
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(this.firebaseConfig);
+                }
                 this.db = firebase.database();
-                this.syncRef = this.db.ref('sync');
-                this.chatRef = this.db.ref('chat');
+                this.syncRef = this.db.ref('player_sync');
+                this.chatRef = this.db.ref('chat_messages');
 
-                this.els = {
-                    login: document.getElementById('login-screen'),
-                    app: document.getElementById('app-container'),
-                    videoZone: document.getElementById('video-zone'),
-                    htmlPlayer: document.getElementById('html5-player'),
-                    urlInput: document.getElementById('video-url'),
-                    messages: document.getElementById('messages'),
-                    chatInput: document.getElementById('chat-input'),
-                    chatZone: document.getElementById('chat-zone'),
-                    chatBtn: document.getElementById('chat-float-btn'),
-                    chatBadge: document.getElementById('chat-badge')
-                };
-
-                this.setupHtml5Listeners();
-                this.setupDragAndDrop();
-                this.setupVisualViewport();
+                this.setupHtml5Events();
             },
 
-            // ==========================================
             // 1. АВТОРИЗАЦИЯ
-            // ==========================================
             login() {
-                const pass = document.getElementById('password').value;
-                const name = document.getElementById('username').value.trim();
+                const passVal = document.getElementById('password').value;
+                const nameVal = document.getElementById('username').value.trim();
 
-                if (pass !== this.PASSWORD) return alert("Неверный пароль! 💔");
-                if (name) this.user = name;
+                if (passVal !== this.password) {
+                    alert("Неверный пароль!");
+                    return;
+                }
 
-                this.els.login.style.display = 'none';
-                this.els.app.style.display = 'flex';
+                if (nameVal) this.username = nameVal;
 
-                this.els.htmlPlayer.load(); // Инициализация контекста для iOS
-                this.startFirebaseSync();
-                this.startChatSync();
+                // Переключаем интерфейс
+                this.ui.loginScreen.style.display = 'none';
+                this.ui.appWrapper.style.display = 'flex';
+
+                // Для iOS/Safari: Инициируем плеер по клику пользователя, чтобы разрешить autoplay в будущем
+                this.ui.htmlPlayer.load();
+
+                // Запускаем службы
+                this.startChatListener();
+                this.startSyncListener();
+                
+                // Запускаем Master Sync Heartbeat (каждую 1 секунду)
                 this.startHeartbeat();
             },
 
-            // ==========================================
-            // 2. ПЛЕЕРЫ И УПРАВЛЕНИЕ (YouTube + HTML5)
-            // ==========================================
-            getYtId(url) {
-                const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&]{11})/);
-                return m ? m[1] : null;
-            },
-
+            // 2. УПРАВЛЕНИЕ ВИДЕО И ПЛЕЕРАМИ
             loadVideo() {
-                const url = this.els.urlInput.value.trim();
+                const url = this.ui.urlInput.value.trim();
                 if (!url) return;
-                this.broadcastState({ url: url, state: 'PAUSED', time: 0 });
-            },
 
-            applyUrl(url) {
-                const ytId = this.getYtId(url);
-                if (ytId) {
-                    this.activeMode = 'youtube';
-                    this.els.htmlPlayer.style.display = 'none';
-                    this.els.htmlPlayer.pause();
-                    document.getElementById('yt-player').style.display = 'block';
-
-                    if (this.ytPlayer && this.ytPlayer.loadVideoById) {
-                        this.ytPlayer.loadVideoById(ytId);
-                    } else if (this.isYtReady) {
-                        this.ytPlayer = new YT.Player('yt-player', {
-                            videoId: ytId,
-                            playerVars: { 'playsinline': 1, 'controls': 1 },
-                            events: { 'onStateChange': (e) => this.onYtStateChange(e) }
-                        });
-                    } else {
-                        setTimeout(() => this.applyUrl(url), 500); // Ждем API
-                    }
-                } else {
-                    this.activeMode = 'html5';
-                    document.getElementById('yt-player').style.display = 'none';
-                    if (this.ytPlayer && this.ytPlayer.pauseVideo) this.ytPlayer.pauseVideo();
-                    
-                    this.els.htmlPlayer.style.display = 'block';
-                    if (this.els.htmlPlayer.src !== url) {
-                        this.els.htmlPlayer.src = url;
-                        this.els.htmlPlayer.load();
-                    }
-                }
-            },
-
-            getCurrentTime() {
-                if (this.activeMode === 'youtube' && this.ytPlayer && this.ytPlayer.getCurrentTime) {
-                    return this.ytPlayer.getCurrentTime();
-                }
-                return this.els.htmlPlayer.currentTime || 0;
-            },
-
-            // ==========================================
-            // 3. НАДЕЖНАЯ СИНХРОНИЗАЦИЯ (Защита от эха)
-            // ==========================================
-            broadcastState(data) {
-                // Если мы применяем чужую команду, не отправляем эхо обратно
-                if (Date.now() < this.syncLockTime) return;
-
-                const payload = {
-                    url: data.url || (this.lastKnownState ? this.lastKnownState.url : ""),
-                    state: data.state, // 'PLAYING' или 'PAUSED'
-                    time: data.time !== undefined ? data.time : this.getCurrentTime(),
-                    updatedAt: firebase.database.ServerValue.TIMESTAMP,
-                    sender: this.clientId
-                };
-
-                // Блокируем локальное восприятие Firebase на 1 секунду, чтобы не дёргать плеер
-                this.syncLockTime = Date.now() + 1000;
-                this.syncRef.set(payload);
-            },
-
-            setupHtml5Listeners() {
-                const p = this.els.htmlPlayer;
-                p.addEventListener('play', () => this.broadcastState({ state: 'PLAYING' }));
-                p.addEventListener('pause', () => this.broadcastState({ state: 'PAUSED' }));
-                p.addEventListener('seeked', () => this.broadcastState({ state: p.paused ? 'PAUSED' : 'PLAYING' }));
-            },
-
-            onYtStateChange(event) {
-                if (event.data === YT.PlayerState.PLAYING) this.broadcastState({ state: 'PLAYING' });
-                if (event.data === YT.PlayerState.PAUSED) this.broadcastState({ state: 'PAUSED' });
-            },
-
-            startFirebaseSync() {
-                this.syncRef.on('value', (snap) => {
-                    const data = snap.val();
-                    if (!data) return;
-                    this.lastKnownState = data;
-
-                    // Игнорируем собственные команды или если мы только что что-то нажали (защита от эха)
-                    if (data.sender === this.clientId || Date.now() < this.syncLockTime) return;
-
-                    // 1. Смена URL
-                    if (data.url && (!this.lastKnownState || this.lastKnownState.url !== data.url)) {
-                        this.applyUrl(data.url);
-                    }
-
-                    // Вычисляем, где сейчас должно быть видео (учет пинга и времени в пути)
-                    let expectedTime = data.time;
-                    if (data.state === 'PLAYING') {
-                        // Если видео играет, прибавляем время, прошедшее с момента отправки команды
-                        const elapsed = (Date.now() - data.updatedAt) / 1000;
-                        if (elapsed > 0 && elapsed < 10) expectedTime += elapsed;
-                    }
-
-                    this.applyRemoteState(data.state, expectedTime);
+                // Сразу отправляем в Firebase новую ссылку и команду Play с 0 секунды
+                this.sendSyncUpdate({
+                    url: url,
+                    state: 'PLAYING',
+                    time: 0
                 });
             },
 
-            applyRemoteState(targetState, targetTime) {
+            applyVideoUrl(url) {
+                const ytId = this.parseYouTubeId(url);
+
+                if (ytId) {
+                    // РЕЖИМ YOUTUBE
+                    this.currentMode = 'youtube';
+                    this.ui.htmlPlayer.style.display = 'none';
+                    this.ui.htmlPlayer.pause();
+                    this.ui.ytPlayerContainer.style.display = 'block';
+
+                    if (window.ytPlayerInstance && window.ytPlayerInstance.loadVideoById) {
+                        window.ytPlayerInstance.loadVideoById(ytId);
+                    } else if (window.isYouTubeApiReady) {
+                        window.ytPlayerInstance = new YT.Player('yt-player', {
+                            videoId: ytId,
+                            playerVars: { 'playsinline': 1, 'controls': 1, 'rel': 0 },
+                            events: {
+                                'onStateChange': this.onYouTubeStateChange.bind(this)
+                            }
+                        });
+                    } else {
+                        // Если API еще грузится, ждем полсекунды
+                        setTimeout(() => this.applyVideoUrl(url), 500);
+                    }
+                } else {
+                    // РЕЖИМ HTML5 (.mp4)
+                    this.currentMode = 'html5';
+                    this.ui.ytPlayerContainer.style.display = 'none';
+                    if (window.ytPlayerInstance && window.ytPlayerInstance.pauseVideo) {
+                        window.ytPlayerInstance.pauseVideo();
+                    }
+                    
+                    this.ui.htmlPlayer.style.display = 'block';
+                    if (this.ui.htmlPlayer.src !== url) {
+                        this.ui.htmlPlayer.src = url;
+                        this.ui.htmlPlayer.load();
+                    }
+                }
+            },
+
+            parseYouTubeId(url) {
+                const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+                const match = url.match(regExp);
+                return (match && match[2].length === 11) ? match[2] : null;
+            },
+
+            getCurrentTime() {
+                if (this.currentMode === 'youtube' && window.ytPlayerInstance && window.ytPlayerInstance.getCurrentTime) {
+                    return window.ytPlayerInstance.getCurrentTime();
+                }
+                return this.ui.htmlPlayer.currentTime || 0;
+            },
+
+            // 3. MASTER SYNC (СИНХРОНИЗАЦИЯ ЧЕРЕЗ FIREBASE)
+            
+            // Локальные события плеера HTML5
+            setupHtml5Events() {
+                const p = this.ui.htmlPlayer;
+                p.addEventListener('play', () => this.handleLocalAction('PLAYING'));
+                p.addEventListener('pause', () => this.handleLocalAction('PAUSED'));
+                p.addEventListener('seeked', () => this.handleLocalAction(p.paused ? 'PAUSED' : 'PLAYING'));
+            },
+
+            // Локальные события плеера YouTube
+            onYouTubeStateChange(event) {
+                if (event.data === YT.PlayerState.PLAYING) this.handleLocalAction('PLAYING');
+                if (event.data === YT.PlayerState.PAUSED) this.handleLocalAction('PAUSED');
+            },
+
+            // Обработка действий пользователя
+            handleLocalAction(state) {
+                if (this.isApplyingRemoteSync) return; // Игнорируем эхо от чужих команд
+                
+                this.sendSyncUpdate({
+                    url: this.ui.htmlPlayer.src || (window.ytPlayerInstance ? window.ytPlayerInstance.getVideoUrl() : ''),
+                    state: state,
+                    time: this.getCurrentTime()
+                });
+            },
+
+            // Отправка данных в базу
+            sendSyncUpdate(data) {
+                this.syncRef.set({
+                    url: data.url || this.lastKnownUrl || '',
+                    state: data.state,
+                    time: data.time !== undefined ? data.time : this.getCurrentTime(),
+                    sender: this.clientId,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
+            },
+
+            // Чтение данных из базы
+            startSyncListener() {
+                this.syncRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (!data) return;
+
+                    // Сохраняем URL для пульса
+                    this.lastKnownUrl = data.url;
+
+                    // Если команду отправили мы сами — игнорируем
+                    if (data.sender === this.clientId) return;
+
+                    // Включаем защиту от эха
+                    this.isApplyingRemoteSync = true;
+
+                    // 1. Смена видео
+                    if (data.url && data.url !== this.currentPlayingUrl) {
+                        this.currentPlayingUrl = data.url;
+                        this.applyVideoUrl(data.url);
+                    }
+
+                    // 2. Вычисление времени с учетом задержки сети
+                    let targetTime = data.time;
+                    if (data.state === 'PLAYING' && data.timestamp) {
+                        const delay = (Date.now() - data.timestamp) / 1000;
+                        if (delay > 0 && delay < 5) targetTime += delay; // Компенсация пинга
+                    }
+
+                    this.applyRemoteState(data.state, targetTime);
+
+                    // Отключаем защиту через 1 секунду (после того как плееры точно применят статус)
+                    setTimeout(() => { this.isApplyingRemoteSync = false; }, 1000);
+                });
+            },
+
+            applyRemoteState(state, targetTime) {
                 const localTime = this.getCurrentTime();
                 
-                // Ставим блокировку, чтобы вызовы play/pause/seekTo не стриггерили локальные EventListeners
-                this.syncLockTime = Date.now() + 1500; 
-
-                // Синхронизация времени (если разрыв > 1.5 сек)
+                // Синхронизация времени, если разрыв больше 1.5 секунд
                 if (Math.abs(localTime - targetTime) > 1.5) {
-                    if (this.activeMode === 'youtube' && this.ytPlayer && this.ytPlayer.seekTo) {
-                        this.ytPlayer.seekTo(targetTime, true);
-                    } else if (this.activeMode === 'html5') {
-                        this.els.htmlPlayer.currentTime = targetTime;
+                    if (this.currentMode === 'youtube' && window.ytPlayerInstance && window.ytPlayerInstance.seekTo) {
+                        window.ytPlayerInstance.seekTo(targetTime, true);
+                    } else if (this.currentMode === 'html5') {
+                        this.ui.htmlPlayer.currentTime = targetTime;
                     }
                 }
 
                 // Синхронизация Play/Pause
-                if (this.activeMode === 'youtube' && this.ytPlayer && this.ytPlayer.getPlayerState) {
-                    const state = this.ytPlayer.getPlayerState();
-                    if (targetState === 'PLAYING' && state !== YT.PlayerState.PLAYING) this.ytPlayer.playVideo();
-                    if (targetState === 'PAUSED' && state === YT.PlayerState.PLAYING) this.ytPlayer.pauseVideo();
-                } else if (this.activeMode === 'html5') {
-                    if (targetState === 'PLAYING' && this.els.htmlPlayer.paused) {
-                        this.els.htmlPlayer.play().catch(e => console.log("Auto-play blocked", e));
+                if (this.currentMode === 'youtube' && window.ytPlayerInstance && window.ytPlayerInstance.getPlayerState) {
+                    const ytState = window.ytPlayerInstance.getPlayerState();
+                    if (state === 'PLAYING' && ytState !== YT.PlayerState.PLAYING) window.ytPlayerInstance.playVideo();
+                    if (state === 'PAUSED' && ytState === YT.PlayerState.PLAYING) window.ytPlayerInstance.pauseVideo();
+                } else if (this.currentMode === 'html5') {
+                    if (state === 'PLAYING' && this.ui.htmlPlayer.paused) {
+                        this.ui.htmlPlayer.play().catch(e => console.warn("Auto-play blocked", e));
                     }
-                    if (targetState === 'PAUSED' && !this.els.htmlPlayer.paused) {
-                        this.els.htmlPlayer.pause();
+                    if (state === 'PAUSED' && !this.ui.htmlPlayer.paused) {
+                        this.ui.htmlPlayer.pause();
                     }
                 }
             },
 
-            // Сердцебиение: периодическая сверка часов (пассивная)
+            // Сердцебиение: Отправляем пульс каждую секунду ТОЛЬКО если мы играем видео
             startHeartbeat() {
                 setInterval(() => {
-                    if (!this.lastKnownState || this.lastKnownState.state !== 'PLAYING') return;
-                    if (Date.now() < this.syncLockTime) return; // Идет активная фаза
+                    if (this.isApplyingRemoteSync) return; // Не отправляем, если сейчас принимаем данные
 
-                    const localTime = this.getCurrentTime();
-                    const expectedTime = this.lastKnownState.time + ((Date.now() - this.lastKnownState.updatedAt) / 1000);
-                    
-                    // Если локальное видео отстало или убежало вперед > 2 сек - мягко корректируем
-                    if (Math.abs(localTime - expectedTime) > 2.0) {
-                        this.applyRemoteState('PLAYING', expectedTime);
+                    let isPlayingLocal = false;
+                    if (this.currentMode === 'html5') {
+                        isPlayingLocal = !this.ui.htmlPlayer.paused;
+                    } else if (this.currentMode === 'youtube' && window.ytPlayerInstance && window.ytPlayerInstance.getPlayerState) {
+                        isPlayingLocal = (window.ytPlayerInstance.getPlayerState() === YT.PlayerState.PLAYING);
                     }
-                }, 2000);
+
+                    // Транслируем свое время, чтобы напарник не отставал
+                    if (isPlayingLocal && this.lastKnownUrl) {
+                        this.sendSyncUpdate({
+                            url: this.lastKnownUrl,
+                            state: 'PLAYING',
+                            time: this.getCurrentTime()
+                        });
+                    }
+                }, 2000); // Каждые 2 секунды достаточно для точной синхронизации
             },
 
-            // ==========================================
-            // 4. СУБТИТРЫ И FULLSCREEN
-            // ==========================================
+            // 4. СУБТИТРЫ
             loadSubtitles(event) {
                 const file = event.target.files[0];
                 if (!file) return;
-                if (this.activeMode === 'youtube') return alert("Субтитры работают только для .mp4!");
 
-                let track = document.getElementById('custom-subtitles');
+                if (this.currentMode === 'youtube') {
+                    alert("Кастомные субтитры работают только для файлов .mp4");
+                    return;
+                }
+
+                let track = document.getElementById('custom-subs');
                 if (!track) {
                     track = document.createElement('track');
-                    track.id = 'custom-subtitles';
+                    track.id = 'custom-subs';
                     track.kind = 'subtitles';
                     track.label = 'Русский';
                     track.srclang = 'ru';
-                    this.els.htmlPlayer.appendChild(track);
+                    this.ui.htmlPlayer.appendChild(track);
                 }
+
                 track.src = URL.createObjectURL(file);
                 track.default = true;
-                setTimeout(() => { if (this.els.htmlPlayer.textTracks[0]) this.els.htmlPlayer.textTracks[0].mode = 'showing'; }, 500);
-            },
 
-            toggleFullscreen() {
-                const wrapper = this.els.videoZone; // Разворачиваем весь блок видео (с кнопкой чата внутри)
-                if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-                    if (wrapper.requestFullscreen) wrapper.requestFullscreen();
-                    else if (wrapper.webkitRequestFullscreen) wrapper.webkitRequestFullscreen();
-                    else if (this.els.htmlPlayer.webkitEnterFullscreen) this.els.htmlPlayer.webkitEnterFullscreen(); // Резерв для iOS
-                } else {
-                    if (document.exitFullscreen) document.exitFullscreen();
-                    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-                }
-            },
-
-            // ==========================================
-            // 5. ЧАТ ЛОГИКА
-            // ==========================================
-            startChatSync() {
-                this.chatRef.on('child_added', (snap) => {
-                    const msg = snap.val();
-                    const div = document.createElement('div');
-                    div.className = `msg ${msg.sender === this.user ? 'my-msg' : 'other-msg'}`;
-                    div.innerHTML = `<div class="msg-name">${msg.sender}</div><span>${msg.text}</span>`;
-                    this.els.messages.appendChild(div);
-                    this.els.messages.scrollTop = this.els.messages.scrollHeight;
-
-                    // Уведомление, если чат сейчас скрыт в оверлее (Landscape/Fullscreen)
-                    const isOverlayMode = window.getComputedStyle(this.els.chatBtn).display !== 'none';
-                    const isClosed = !this.els.chatZone.classList.contains('show-overlay');
-                    if (isOverlayMode && isClosed && msg.sender !== this.user) {
-                        this.els.chatBadge.style.display = 'block';
+                setTimeout(() => {
+                    if (this.ui.htmlPlayer.textTracks && this.ui.htmlPlayer.textTracks[0]) {
+                        this.ui.htmlPlayer.textTracks[0].mode = 'showing';
                     }
+                }, 500);
+            },
+
+            // 5. ЧАТ ЛОГИКА
+            startChatListener() {
+                this.chatRef.on('child_added', (snapshot) => {
+                    const msg = snapshot.val();
+                    this.renderMessage(msg.sender, msg.text);
                 });
             },
 
             sendMessage() {
-                const text = this.els.chatInput.value.trim();
+                const text = this.ui.chatInput.value.trim();
                 if (!text) return;
-                this.chatRef.push({ sender: this.user, text: text, timestamp: firebase.database.ServerValue.TIMESTAMP });
-                this.els.chatInput.value = "";
-                this.els.chatInput.focus();
+
+                this.chatRef.push({
+                    sender: this.username,
+                    text: text,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
+
+                this.ui.chatInput.value = "";
+                // Возвращаем фокус, чтобы можно было писать дальше
+                this.ui.chatInput.focus(); 
             },
 
-            handleChatEnter(e) { if (e.key === 'Enter') this.sendMessage(); },
-
-            toggleChatOverlay() {
-                this.els.chatZone.classList.toggle('show-overlay');
-                if (this.els.chatZone.classList.contains('show-overlay')) {
-                    this.els.chatBadge.style.display = 'none';
-                    this.els.messages.scrollTop = this.els.messages.scrollHeight;
-                    setTimeout(() => this.els.chatInput.focus(), 100);
+            handleChatKey(e) {
+                if (e.key === 'Enter') {
+                    this.sendMessage();
                 }
             },
 
-            // ==========================================
-            // 6. UX / ИНТЕРФЕЙСНЫЕ ФИКСЫ
-            // ==========================================
-            
-            // Фикс для клавиатуры iOS/Android (чтобы чат не скрывался за клавой)
-            setupVisualViewport() {
-                if (window.visualViewport) {
-                    window.visualViewport.addEventListener('resize', () => {
-                        document.body.style.height = window.visualViewport.height + 'px';
-                        window.scrollTo(0, 0);
-                    });
-                }
-            },
+            renderMessage(sender, text) {
+                const isMe = (sender === this.username);
+                
+                const wrapper = document.createElement('div');
+                wrapper.className = `msg-container ${isMe ? 'my-msg' : 'other-msg'}`;
+                
+                const name = document.createElement('div');
+                name.className = 'msg-name';
+                name.innerText = sender;
 
-            // Драг-н-дроп кнопки
-            setupDragAndDrop() {
-                const btn = this.els.chatBtn;
-                let isDragging = false, isMoved = false;
-                let startX, startY, initialLeft, initialTop;
+                const bubble = document.createElement('div');
+                bubble.className = 'msg-bubble';
+                bubble.innerText = text;
 
-                const start = (e) => {
-                    isDragging = true; isMoved = false;
-                    startX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
-                    startY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
-                    const rect = btn.getBoundingClientRect();
-                    initialLeft = rect.left; initialTop = rect.top;
-                    
-                    btn.style.left = initialLeft + 'px';
-                    btn.style.top = initialTop + 'px';
-                    btn.style.right = 'auto'; btn.style.bottom = 'auto';
-                };
+                wrapper.appendChild(name);
+                wrapper.appendChild(bubble);
 
-                const move = (e) => {
-                    if (!isDragging) return;
-                    const cx = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
-                    const cy = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
-                    const dx = cx - startX, dy = cy - startY;
-                    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) isMoved = true;
-
-                    if (isMoved) {
-                        e.preventDefault(); // Останавливаем скролл
-                        const maxW = window.innerWidth - btn.offsetWidth;
-                        const maxH = window.innerHeight - btn.offsetHeight;
-                        btn.style.left = Math.max(0, Math.min(initialLeft + dx, maxW)) + 'px';
-                        btn.style.top = Math.max(0, Math.min(initialTop + dy, maxH)) + 'px';
-                    }
-                };
-
-                const end = () => {
-                    if (!isDragging) return;
-                    isDragging = false;
-                    if (!isMoved) this.toggleChatOverlay(); // Если не тащили — значит кликнули
-                };
-
-                btn.addEventListener('mousedown', start);
-                document.addEventListener('mousemove', move, { passive: false });
-                document.addEventListener('mouseup', end);
-
-                btn.addEventListener('touchstart', start, { passive: false });
-                document.addEventListener('touchmove', move, { passive: false });
-                document.addEventListener('touchend', end);
+                this.ui.chatMessages.appendChild(wrapper);
+                
+                // Прокрутка вниз
+                this.ui.chatMessages.scrollTop = this.ui.chatMessages.scrollHeight;
             }
         };
 
-        // Глобальная функция для YouTube API
-        function onYouTubeIframeAPIReady() { app.isYtReady = true; }
+        // Глобальная функция-callback для YouTube API
+        window.isYouTubeApiReady = false;
+        function onYouTubeIframeAPIReady() {
+            window.isYouTubeApiReady = true;
+        }
 
-        // Инициализация при загрузке
-        window.onload = () => app.init();
+        // Запуск
+        document.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
     </script>
 </body>
 </html>
