@@ -937,14 +937,14 @@ function initPlayer() {
   const vol = $('vol-range');
 
   /* Play / Pause button */
-  $('play-btn').onclick = () => { togglePlay(); pushSync(); };
+  $('play-btn').onclick = e => { e.stopPropagation(); togglePlay(); pushSync(); };
 
   /* YT tap shield — intercept clicks on YT iframe */
-  $('yt-shield').onclick = () => { togglePlay(); pushSync(); showCtrl(); };
+  $('yt-shield').onclick = e => { e.stopPropagation(); togglePlay(); pushSync(); showCtrl(); };
 
   /* Skip */
-  $('back-btn').onclick = () => seekRel(-10);
-  $('fwd-btn').onclick  = () => seekRel(+10);
+  $('back-btn').onclick = e => { e.stopPropagation(); seekRel(-10); };
+  $('fwd-btn').onclick  = e => { e.stopPropagation(); seekRel(+10); };
 
   /* ── Progress drag ── */
   function seekFromX(clientX) {
@@ -956,11 +956,11 @@ function initPlayer() {
   }
   pw.addEventListener('mousedown', e => {
     progDragging = true; pw.classList.add('drag');
-    seekFromX(e.clientX); e.preventDefault();
+    seekFromX(e.clientX); e.preventDefault(); e.stopPropagation();
   });
   pw.addEventListener('touchstart', e => {
     progDragging = true; pw.classList.add('drag');
-    seekFromX(e.touches[0].clientX); showCtrl();
+    seekFromX(e.touches[0].clientX); showCtrl(); e.stopPropagation();
   }, { passive: true });
   document.addEventListener('mousemove', e => {
     if (progDragging) seekFromX(e.clientX);
@@ -982,23 +982,52 @@ function initPlayer() {
     v.volume = +e.target.value;
     $('mute-btn').textContent = +e.target.value > 0 ? '🔊' : '🔇';
   };
-  $('mute-btn').onclick = () => {
+  $('mute-btn').onclick = e => {
+    e.stopPropagation();
     v.muted = !v.muted;
     $('mute-btn').textContent = v.muted ? '🔇' : '🔊';
   };
+  $('vol-range').onclick = e => e.stopPropagation();
 
   /* Fullscreen */
-  $('fs-btn').onclick = toggleFS;
+  $('fs-btn').onclick = e => { e.stopPropagation(); toggleFS(); };
 
-  /* ── Controls auto-hide ── */
+  /* ── Desktop: click on video area = play/pause (always show controls first) ── */
   $('player-wrap').addEventListener('click', e => {
-    /* Don't toggle if click was on a control button */
-    if (e.target.closest('#ctrl-bar') || e.target.closest('#sync-pill') || e.target.closest('#user-pill')) return;
-    if ($('yt-shield').contains(e.target)) return; // handled by shield
-    ctrlVisible ? hideCtrl() : showCtrl();
+    if (e.target.closest('#ctrl-bar')) return;
+    if (e.target.closest('#sync-pill')) return;
+    if (e.target.closest('#user-pill')) return;
+    if (window.innerWidth >= 768) {
+      // Desktop: always play/pause on click
+      togglePlay(); pushSync(); showCtrl();
+    }
+    // Mobile: handled by touchend double-tap logic below
   });
+
+  /* ── Mobile: double-tap left/right to seek ── */
+  let tapTimer = null, tapCount = 0, tapX = 0;
+  $('player-wrap').addEventListener('touchend', e => {
+    // Ignore taps on controls bar
+    if (e.target.closest('#ctrl-bar')) return;
+    tapCount++;
+    tapX = e.changedTouches[0].clientX;
+    if (tapCount === 1) {
+      tapTimer = setTimeout(() => {
+        // Single tap: toggle controls
+        tapCount = 0;
+        ctrlVisible ? hideCtrl() : showCtrl();
+      }, 260);
+    } else if (tapCount === 2) {
+      clearTimeout(tapTimer);
+      tapCount = 0;
+      const pw = $('player-wrap');
+      const half = pw.getBoundingClientRect().width / 2;
+      if (tapX < half) { seekRel(-10); showCtrl(); showSeekFeedback(-10); }
+      else             { seekRel(+10); showCtrl(); showSeekFeedback(+10); }
+    }
+  }, { passive: true });
+
   $('player-wrap').addEventListener('mousemove', showCtrl);
-  $('player-wrap').addEventListener('touchstart', showCtrl, { passive: true });
 
   /* ── Video element events ── */
   v.addEventListener('play',           () => $('play-btn').textContent = '⏸');
@@ -1019,7 +1048,7 @@ function initPlayer() {
   ['fullscreenchange','webkitfullscreenchange'].forEach(ev =>
     document.addEventListener(ev, () => {
       const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
-      $('fs-btn').textContent = isFS ? '✕' : '⛶';
+      $('fs-btn').textContent = isFS ? '⊡' : '⛶';
       showCtrl();
     })
   );
@@ -1080,13 +1109,45 @@ function showCtrl() {
   $('ctrl-overlay').classList.remove('hidden');
   clearTimeout(ctrlHideTimer);
   const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
-  if (isFS) ctrlHideTimer = setTimeout(hideCtrl, CTRL_TIMEOUT);
+  // Auto-hide only in fullscreen, or on mobile always
+  if (isFS || window.innerWidth < 768) {
+    ctrlHideTimer = setTimeout(hideCtrl, CTRL_TIMEOUT);
+  }
 }
 function hideCtrl() {
+  // Desktop outside FS: always keep controls visible
   const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
-  if (!isFS) return; // never hide outside fullscreen
+  if (!isFS && window.innerWidth >= 768) return;
   ctrlVisible = false;
   $('ctrl-overlay').classList.add('hidden');
+}
+
+/* Seek feedback flash for mobile double-tap */
+function showSeekFeedback(seconds) {
+  const id = 'sf_' + (seconds < 0 ? 'l' : 'r');
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = id;
+    Object.assign(el.style, {
+      position:'absolute', top:'50%', transform:'translateY(-50%)',
+      [seconds < 0 ? 'left' : 'right']: '10%',
+      background:'rgba(0,0,0,.5)', borderRadius:'50%',
+      width:'70px', height:'70px',
+      display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center',
+      pointerEvents:'none', zIndex:'25',
+      fontSize:'20px', color:'#fff',
+      fontFamily:'DM Mono,monospace',
+      transition:'opacity .35s',
+    });
+    $('player-wrap').appendChild(el);
+  }
+  el.innerHTML = (seconds < 0 ? '⏪' : '⏩') +
+    '<br><span style="font-size:10px">' + Math.abs(seconds) + 'с</span>';
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; }, 800);
 }
 
 /* Fullscreen */
