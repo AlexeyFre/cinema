@@ -805,6 +805,18 @@ function tryEnter() {
   initDrawer();
   initKeyboard();
   initKeyboardShortcuts();
+
+  // Safari iOS: unlock audio/video context on user gesture (the Enter button tap)
+  // Without this, programmatic .play() calls silently fail until user taps the video.
+  const v = $('vid');
+  v.muted = true;
+  v.play().then(() => {
+    v.pause();
+    v.currentTime = 0;
+    v.muted = false;
+  }).catch(() => {
+    v.muted = false; // already unlocked or not needed
+  });
 }
 
 $('enter-btn').onclick = tryEnter;
@@ -848,6 +860,7 @@ function getYtId(url) {
 function loadMP4(src) {
   destroyYT();
   const v = $('vid');
+  v.preload = 'metadata';   // Only load metadata, not the full file
   v.src = src;
   v.style.display = 'block';
   $('yt-wrap').classList.remove('on');
@@ -992,38 +1005,49 @@ function initPlayer() {
   /* Fullscreen */
   $('fs-btn').onclick = e => { e.stopPropagation(); toggleFS(); };
 
-  /* ── Desktop: click on video area = play/pause (always show controls first) ── */
+  /* ── Desktop: click on video area = play/pause + show controls ── */
   $('player-wrap').addEventListener('click', e => {
     if (e.target.closest('#ctrl-bar')) return;
     if (e.target.closest('#sync-pill')) return;
     if (e.target.closest('#user-pill')) return;
+    if (e.target.closest('#yt-shield')) return; // YT shield handles its own click
     if (window.innerWidth >= 768) {
-      // Desktop: always play/pause on click
+      // Desktop: click = always play/pause, always show controls
       togglePlay(); pushSync(); showCtrl();
     }
-    // Mobile: handled by touchend double-tap logic below
+    // Mobile single/double tap handled by touchend above
   });
 
-  /* ── Mobile: double-tap left/right to seek ── */
+  /* ── Mobile: tap = show controls, double-tap left third / right third to seek ── */
   let tapTimer = null, tapCount = 0, tapX = 0;
   $('player-wrap').addEventListener('touchend', e => {
-    // Ignore taps on controls bar
+    // Ignore taps on controls bar to avoid conflicts
     if (e.target.closest('#ctrl-bar')) return;
     tapCount++;
     tapX = e.changedTouches[0].clientX;
+
     if (tapCount === 1) {
       tapTimer = setTimeout(() => {
-        // Single tap: toggle controls
         tapCount = 0;
-        ctrlVisible ? hideCtrl() : showCtrl();
-      }, 260);
-    } else if (tapCount === 2) {
+        // Single tap: always show controls (reset auto-hide timer via showCtrl)
+        showCtrl();
+      }, 270);
+    } else if (tapCount >= 2) {
       clearTimeout(tapTimer);
       tapCount = 0;
-      const pw = $('player-wrap');
-      const half = pw.getBoundingClientRect().width / 2;
-      if (tapX < half) { seekRel(-10); showCtrl(); showSeekFeedback(-10); }
-      else             { seekRel(+10); showCtrl(); showSeekFeedback(+10); }
+      const rect = $('player-wrap').getBoundingClientRect();
+      const third = rect.width / 3;
+      const relX  = tapX - rect.left;
+      if (relX < third) {
+        // Left third → rewind
+        seekRel(-10); showCtrl(); showSeekFeedback(-10);
+      } else if (relX > third * 2) {
+        // Right third → forward
+        seekRel(+10); showCtrl(); showSeekFeedback(+10);
+      } else {
+        // Centre → play/pause
+        togglePlay(); pushSync(); showCtrl();
+      }
     }
   }, { passive: true });
 
@@ -1045,10 +1069,14 @@ function initPlayer() {
   }, 500);
 
   /* ── Fullscreen change ── */
+  const FS_ICON_ENTER = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+  const FS_ICON_EXIT  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>`;
+  $('fs-btn').innerHTML = FS_ICON_ENTER;
+
   ['fullscreenchange','webkitfullscreenchange'].forEach(ev =>
     document.addEventListener(ev, () => {
       const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
-      $('fs-btn').textContent = isFS ? '⊡' : '⛶';
+      $('fs-btn').innerHTML = isFS ? FS_ICON_EXIT : FS_ICON_ENTER;
       showCtrl();
     })
   );
