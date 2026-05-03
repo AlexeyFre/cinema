@@ -162,40 +162,40 @@ body {
     overflow: hidden;
   }
   #m-handle, #peek-row, #backdrop { display: none !important; }
+  /* Chat-only mode on desktop: full width chat */
+  #app.chat-only #vcol { display: none; }
+  #app.chat-only #ccol { width: 100%; border-left: none; }
 }
 
-/* MOBILE: stacked, chat is bottom drawer */
+/* MOBILE: stacked layout — player on top, chat always visible below */
 @media (max-width: 767px) {
-  #app { flex-direction: column; position: relative; }
+  #app { flex-direction: column; }
+
+  /* Video column: fixed 42% of screen height */
   #vcol {
-    /* Take full height minus the 52px peek strip */
-    height: calc(100% - 52px);
-    flex-shrink: 0;
+    flex: 0 0 42dvh;
     display: flex; flex-direction: column; overflow: hidden;
   }
+
+  /* Chat column: fills remaining space, always visible */
   #ccol {
-    position: fixed;
-    left: 0; right: 0; bottom: 0;
-    height: 78dvh;            /* max when open */
-    z-index: 500;
-    background: var(--s1); border-top: 1px solid var(--border);
-    border-radius: 18px 18px 0 0;
+    flex: 1;
     display: flex; flex-direction: column;
-    /* Closed: show only 52px peek strip */
-    transform: translateY(calc(100% - 52px));
-    transition: transform .3s cubic-bezier(.4,0,.2,1);
-    will-change: transform;
+    background: var(--s1);
+    border-top: 1px solid var(--border);
+    overflow: hidden;
+    /* No drawer transform — always shown */
   }
-  #ccol.open { transform: translateY(0); }
-  #backdrop {
-    position: fixed; inset: 0; z-index: 499;
-    background: rgba(0,0,0,.5);
-    opacity: 0; pointer-events: none;
-    transition: opacity .3s;
-  }
-  #backdrop.on { opacity: 1; pointer-events: all; }
-  /* Hide desktop chat header on mobile */
-  #chat-hdr { display: none; }
+
+  /* Hide drawer-specific elements */
+  #m-handle, #peek-row, #backdrop { display: none !important; }
+
+  /* Show desktop chat header on mobile too (shows partner status) */
+  #chat-hdr { display: block; }
+
+  /* Chat only mode: full height for chat */
+  #app.chat-only #vcol  { display: none; }
+  #app.chat-only #ccol  { flex: 1; border-top: none; }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -501,6 +501,11 @@ body {
   font-size: 15px; font-style: italic; color: var(--accent); margin-bottom: 3px;
 }
 .ch-sub { font-size: 10px; color: var(--muted); letter-spacing: .07em; }
+/* Mobile: make chat header more compact */
+@media (max-width: 767px) {
+  #chat-hdr { padding: 8px 12px 6px; }
+  .ch-title  { font-size: 13px; margin-bottom: 1px; }
+}
 .odot {
   display: inline-block; width: 5px; height: 5px;
   border-radius: 50%; background: var(--green);
@@ -1053,13 +1058,10 @@ function tryEnter() {
   }
   initChat();
   initPresence();
+  initKeyboard();           // always — iOS keyboard needs this in every mode
   if (!chatOnlyMode) {
     initDrawer();
-    initKeyboard();
     initKeyboardShortcuts();
-  } else {
-    // In chat-only mode show partner label in the always-visible header
-    $('partner-lbl').textContent = 'Ожидание партнёра…';
   }
 
   // ── iOS audio unlock via AudioContext ──
@@ -1110,9 +1112,10 @@ function initFirebaseRefs() {
   db_chat        = ref(db, base + '/chat');
   db_pres_me     = ref(db, base + '/pres/'   + safeKey);
   db_typing_me   = ref(db, base + '/typing/' + safeKey);
+  db_typing_room = ref(db, base + '/typing');   // ← FIX: was missing, crashed initChat
   db_reactions   = ref(db, base + '/reactions');
-  // Clean up typing status on disconnect
   onDisconnect(db_typing_me).remove();
+  onDisconnect(db_pres_me).remove();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1701,8 +1704,8 @@ function initSync() {
 
     const age = Date.now() - (d.ts || 0);
 
-    // Echo suppression: ignore our own pushes within 1s
-    if (d.by === myName && age < 1000) return;
+    // Echo suppression: ignore our own pushes within 2s
+    if (d.by === myName && age < 2000) return;
 
     suppressSync = true;
 
@@ -1726,9 +1729,10 @@ function initSync() {
     console.error('sync listener error:', err);
   });
 
-  // Heartbeat: push state every N seconds so late-joiner syncs
+  // Heartbeat: push state every N seconds so late-joiner syncs.
+  // Only push during playback (not paused) to avoid unnecessary seek commands.
   setInterval(() => {
-    if (lastPushedUrl && !suppressSync) pushSync();
+    if (lastPushedUrl && !suppressSync && isPlaying()) pushSync();
   }, HB_INTERVAL);
 }
 
@@ -2065,47 +2069,29 @@ function spawnFloat(emoji, anchor) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   MOBILE DRAWER
+   DRAWER / CHAT OPEN STATE
+   Mobile: chat is always visible, so drawerOpen = true always.
+   Desktop: no drawer needed either — chat is a fixed side panel.
 ═══════════════════════════════════════════════════════ */
 function initDrawer() {
-  const ccol     = $('ccol');
-  const backdrop = $('backdrop');
-
-  function open() {
+  // On mobile the chat is always visible (stacked layout).
+  // Set drawerOpen=true so unread badge logic knows chat is in view.
+  if (window.innerWidth < 768) {
     drawerOpen = true;
-    ccol.classList.add('open');
-    backdrop.classList.add('on');
-    // Reset unread
-    unread = 0;
-    $('unread-badge').textContent = '';
-    $('unread-badge').classList.remove('on');
-    // Scroll to bottom
-    setTimeout(() => { $('msgs').scrollTop = $('msgs').scrollHeight; }, 320);
   }
-  function close() {
-    drawerOpen = false;
-    ccol.classList.remove('open');
-    backdrop.classList.remove('on');
-  }
-
-  $('m-handle').addEventListener('click', () => drawerOpen ? close() : open());
-  $('peek-row').addEventListener('click', () => drawerOpen ? close() : open());
-  backdrop.addEventListener('click', close);
-
-  // Swipe to close
-  let swipeY = 0;
-  ccol.addEventListener('touchstart', e => { swipeY = e.touches[0].clientY; }, { passive: true });
-  ccol.addEventListener('touchend', e => {
-    const dy = e.changedTouches[0].clientY - swipeY;
-    if (dy > 55 && drawerOpen)  close();
-    if (dy < -55 && !drawerOpen) open();
-  }, { passive: true });
+  // Desktop: chat column is always visible — nothing to open/close.
 }
 
 /* ═══════════════════════════════════════════════════════
    iOS KEYBOARD (visualViewport)
 ═══════════════════════════════════════════════════════ */
 function initKeyboard() {
+  // On mobile chat is always visible → drawerOpen stays true
+  if (window.innerWidth < 768) drawerOpen = true;
+  window.addEventListener('resize', () => {
+    if (window.innerWidth < 768) drawerOpen = true;
+  });
+
   if (!window.visualViewport) return;
   const wrap = $('chat-inp-wrap');
   window.visualViewport.addEventListener('resize', () => {
