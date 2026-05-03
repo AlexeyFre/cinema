@@ -198,6 +198,33 @@ body {
   #app.chat-only #ccol  { flex: 1; border-top: none; }
 }
 
+/* MOBILE LANDSCAPE: side-by-side layout like desktop */
+@media (max-width: 767px) and (orientation: landscape) {
+  #app { flex-direction: row; }
+  #vcol {
+    flex: 0 0 52%;
+    height: 100%;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #ccol {
+    flex: 1;
+    height: 100%;
+    border-top: none;
+    border-left: 1px solid var(--border);
+  }
+  /* Compact chat chrome to maximize message area */
+  #status-bar  { display: none; }
+  #react-bar   { padding: 4px 10px 0; }
+  .rb          { padding: 3px 6px; font-size: 13px; }
+  #quick-phrases { display: none; }
+  #chat-hdr    { padding: 5px 12px 4px; }
+  .ch-title    { font-size: 12px; margin-bottom: 0; }
+  .ch-sub      { font-size: 9px; }
+  /* Chat-only in landscape: full width */
+  #app.chat-only #vcol { display: none; }
+  #app.chat-only #ccol { flex: 1; border-left: none; }
+}
+
 /* ═══════════════════════════════════════════════════════
    TOP BAR
 ═══════════════════════════════════════════════════════ */
@@ -465,6 +492,8 @@ body {
   #ctrl-row  { gap: 0; }
   .cb        { padding: 5px 5px; }
   .cb.sm     { padding: 4px 4px; }
+  /* Prevent iOS auto-zoom on inputs (requires font-size >= 16px) */
+  #url-inp, #vtt-inp { font-size: 16px; }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -546,6 +575,7 @@ body {
   font-size: 13px; line-height: 1.5;
   word-break: break-word;
   user-select: text; -webkit-user-select: text;
+  position: relative; /* needed for heart badge positioning */
 }
 .msg.me   .msg-bbl { background: rgba(201,149,110,.22); border: 1px solid rgba(201,149,110,.22); border-bottom-right-radius: 4px; }
 .msg.them .msg-bbl { background: var(--s2); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
@@ -557,13 +587,14 @@ body {
   position: relative; align-self: flex-end;
 }
 .msg-heart {
-  position: absolute; bottom: -10px; right: 4px;
+  position: absolute; bottom: -10px; right: 6px;
   background: var(--s1); border: 1px solid var(--border);
   border-radius: 20px; padding: 1px 5px;
   font-size: 11px; display: flex; align-items: center; gap: 2px;
   white-space: nowrap; pointer-events: none;
   box-shadow: 0 1px 4px rgba(0,0,0,.4);
   transition: transform .15s;
+  z-index: 2;
 }
 .msg-heart.pop { animation: heartPop .3s ease-out; }
 @keyframes heartPop {
@@ -571,8 +602,9 @@ body {
   50%  { transform: scale(1.45); }
   100% { transform: scale(1); }
 }
-.msg.me .msg-heart  { right: 6px; left: auto; }
-.msg.them .msg-heart { left: 6px; right: auto; }
+/* Align heart to the right on "me" bubbles, left on "them" bubbles */
+.msg.me .msg-bbl .msg-heart   { right: 6px; left: auto; }
+.msg.them .msg-bbl .msg-heart { left: 6px; right: auto; }
 
 /* double-tap feedback flash */
 .msg-bbl.tap-flash { animation: bblFlash .25s ease; }
@@ -1130,18 +1162,9 @@ $('url-inp').addEventListener('input', () => {
   $('clear-btn').style.display = $('url-inp').value ? '' : 'none';
 });
 $('clear-btn').onclick = () => {
-  $('url-inp').value = '';
-  $('clear-btn').style.display = 'none';
-  // Stop & hide video
-  lastPushedUrl = '';
-  const v = $('vid');
-  v.pause(); v.removeAttribute('src'); v.load();
-  $('vid').style.display = 'none';
-  destroyYT();
-  $('yt-wrap').style.display = 'none';
-  $('ph').style.display = '';
-  // Broadcast clear to partner
-  if (!chatOnlyMode) set(db_sync, { url:'', isYT:false, playing:false, time:0, by:myName, ts:Date.now() });
+  clearVideoLocally();
+  // Broadcast clear to ALL users (including partner)
+  if (!chatOnlyMode) set(db_sync, { url: '', isYT: false, playing: false, time: 0, by: myName, ts: Date.now(), clear: true });
 };
 
 $('force-sync-btn').onclick = () => {
@@ -1161,6 +1184,20 @@ $('force-sync-btn').onclick = () => {
   toast('Синхронизирую всех к твоему времени ⟳');
 };
 $('vtt-btn').onclick = applyVtt;
+
+function clearVideoLocally() {
+  $('url-inp').value = '';
+  lastPushedUrl = '';
+  const cb = $('clear-btn');
+  if (cb) cb.style.display = 'none';
+  const v = $('vid');
+  v.pause(); v.removeAttribute('src'); v.load();
+  v.style.display = 'none';
+  destroyYT();
+  $('yt-wrap').classList.remove('on');
+  $('yt-wrap').style.display = '';
+  $('ph').style.display = '';
+}
 
 function loadUrl(url, broadcast) {
   if (!url) return;
@@ -1706,13 +1743,18 @@ function initSync() {
   onValue(db_sync, snap => {
     const d = snap.val();
     if (!d) { setSS('ok', 'Готово'); return; }
-    // Пункт 1: в режиме «только чат» игнорируем входящие команды синхронизации
     if (chatOnlyMode) return;
 
     const age = Date.now() - (d.ts || 0);
 
     // Echo suppression: ignore our own pushes within 2s
     if (d.by === myName && age < 2000) return;
+
+    // ── Clear signal: partner pressed ✕ ──
+    if (d.clear && (!d.url || d.url === '')) {
+      clearVideoLocally();
+      return;
+    }
 
     suppressSync = true;
 
@@ -1730,14 +1772,14 @@ function initSync() {
       applyRemote(d);
     }
 
-    setTimeout(() => { suppressSync = false; }, 800);
+    // Extended timeout: must outlast YT onStateChange debounce (600ms) + buffer
+    setTimeout(() => { suppressSync = false; }, 1500);
   }, err => {
     setSS('err', 'Ошибка подключения');
     console.error('sync listener error:', err);
   });
 
   // Heartbeat: only for late-joiners (time sync).
-  // Marked as isHeartbeat=true so the remote side won't override play/pause state.
   setInterval(() => {
     if (lastPushedUrl && !suppressSync && isPlaying()) pushSync(true);
   }, HB_INTERVAL);
@@ -1749,16 +1791,12 @@ function applyRemote(d) {
     ? (d.time || 0) + ageSec   // compensate network latency
     : (d.time || 0);
 
-  // ── Seek sync (applies to both heartbeats and explicit actions) ──
-  // «Sync by slowest»: if we're ahead → pull back.
-  // If we're way behind (new joiner / reconnect) → catch up.
-  // Small drift (< SYNC_DRIFT) → ignore, natural playback handles it.
   const drift = getCur() - targetTime; // positive = we're ahead
 
   if (d.isHeartbeat) {
-    // Heartbeat: only fix large drifts (late-joiner recovery)
-    // Do NOT touch play/pause — that would override local user actions
-    if (Math.abs(drift) > 15) {
+    // Heartbeat: only seek if we're playing AND drift is large.
+    // NEVER seek a paused device from a heartbeat (would shift frame unexpectedly).
+    if (isPlaying() && Math.abs(drift) > 15) {
       seekAbs(targetTime, false);
       setSS('warn', 'Синхронизация…');
       setTimeout(() => setSS('ok', 'Синхронизировано'), 1500);
@@ -1769,35 +1807,22 @@ function applyRemote(d) {
   }
 
   // ── Explicit user action ──
-  // Only apply if the remote action is newer than our last local action.
-  // This prevents stale remote commands from overriding what we just did.
-  const remoteTs = d.ts || 0;
-  if (remoteTs <= lastLocalActionTs) {
-    // Remote action is older than what we already did locally — ignore play/pause,
-    // but still apply seek if drift is huge (safety net)
-    if (Math.abs(drift) > 30) seekAbs(targetTime, false);
-    return;
+
+  // Apply seek only if remote action is newer than last local action (or drift is huge)
+  const remoteTs   = d.ts || 0;
+  const seekAllowed = remoteTs > lastLocalActionTs || Math.abs(drift) > 30;
+  if (seekAllowed) {
+    if (Math.abs(drift) > 2) {
+      seekAbs(targetTime, false);
+      if (Math.abs(drift) > SYNC_DRIFT) {
+        setSS('warn', 'Синхронизация…');
+        setTimeout(() => setSS('ok', 'Синхронизировано'), 1500);
+        return;
+      }
+    }
   }
 
-  // Apply seek if needed
-  if (drift > SYNC_DRIFT) {
-    // We're ahead → pull back to match remote (sync by slowest)
-    seekAbs(targetTime, false);
-    setSS('warn', 'Синхронизация…');
-    setTimeout(() => setSS('ok', 'Синхронизировано'), 1500);
-  } else if (drift < -30) {
-    // Far behind → catch up
-    seekAbs(targetTime, false);
-    setSS('warn', 'Синхронизация…');
-    setTimeout(() => setSS('ok', 'Синхронизировано'), 1500);
-  } else if (Math.abs(drift) > 2) {
-    // Moderate drift from explicit seek → apply immediately
-    seekAbs(targetTime, false);
-  } else {
-    setSS('ok', 'Синхронизировано');
-  }
-
-  // Apply play/pause state
+  // ── Play/Pause: ALWAYS apply remote state, never silently drop it ──
   if (d.playing && !isPlaying()) {
     if (isYT) { if (ytPlayer) ytPlayer.playVideo(); }
     else {
@@ -1810,6 +1835,8 @@ function applyRemote(d) {
     if (isYT) { if (ytPlayer) ytPlayer.pauseVideo(); }
     else $('vid').pause();
   }
+
+  setSS('ok', 'Синхронизировано');
 }
 
 function setSS(state, text) {
@@ -1831,8 +1858,18 @@ function initPresence() {
   pushPresence();
   onDisconnect(db_pres_me).remove();
 
-  // Обновляем свой таймкод каждые 2с
-  if (!chatOnlyMode) setInterval(pushPresence, 1000);
+  // Обновляем своё присутствие регулярно (и в обычном режиме, и в chat-only)
+  // В chat-only — раз в 5с, в обычном — раз в секунду (для таймкода)
+  setInterval(pushPresence, chatOnlyMode ? 5000 : 1000);
+
+  // При переподключении Firebase (например, после фона) — сразу заново пушим присутствие
+  const connRef = ref(db, '.info/connected');
+  onValue(connRef, snap => {
+    if (snap.val() === true) {
+      onDisconnect(db_pres_me).remove();
+      pushPresence();
+    }
+  });
 
   const presRoomRef = ref(db, 'rooms/' + roomId + '/pres');
   onValue(presRoomRef, snap => {
@@ -2033,23 +2070,40 @@ function buildMsg(m, key) {
 }
 
 // ── Double-tap heart reaction ──
-const _tapTimers = {};
 function attachDoubleTap(div, key) {
-  function onTap() {
-    if (_tapTimers[key]) {
-      clearTimeout(_tapTimers[key]);
-      delete _tapTimers[key];
-      // Double-tap confirmed → toggle heart
+  let lastTapTime = 0;
+  let touchHandled = false;
+
+  // Touch: manual double-tap detection
+  div.addEventListener('touchend', e => {
+    touchHandled = true;
+    // Reset flag after the synthetic click fires (~300ms)
+    clearTimeout(div._thReset);
+    div._thReset = setTimeout(() => { touchHandled = false; }, 600);
+
+    e.stopPropagation();
+    const now = Date.now();
+    if (now - lastTapTime < 380) {
+      lastTapTime = 0;
       toggleHeart(key, div);
     } else {
-      _tapTimers[key] = setTimeout(() => delete _tapTimers[key], 320);
+      lastTapTime = now;
     }
-  }
-  div.addEventListener('dblclick', () => toggleHeart(key, div));
-  div.addEventListener('touchend', e => { e.stopPropagation(); onTap(); }, { passive: true });
+  }, { passive: true });
+
+  // Mouse (desktop only): use native dblclick, ignore if already handled by touch
+  div.addEventListener('dblclick', () => {
+    if (touchHandled) return; // already handled by touchend above
+    toggleHeart(key, div);
+  });
 }
 
+const _heartThrottle = {};
 function toggleHeart(key, div) {
+  const now = Date.now();
+  if (_heartThrottle[key] && now - _heartThrottle[key] < 600) return;
+  _heartThrottle[key] = now;
+
   const safeKey = myName.replace(/[.#$\/\[\]]/g,'_');
   const heartRef = ref(db, 'rooms/' + roomId + '/reactions/' + key + '/hearts/' + safeKey);
   // Flash the bubble
@@ -2075,21 +2129,24 @@ function initReactions() {
 }
 
 function updateHeartBadge(div, hearts) {
-  const safeMe = myName.replace(/[.#$\/\[\]]/g,'_');
-  const iLiked = hearts.includes(safeMe);
   let badge = div.querySelector('.msg-heart');
   if (hearts.length === 0) {
     if (badge) badge.remove();
     return;
   }
+  // Attach heart to the bubble element, not to the message wrapper,
+  // so it overlaps the bottom of the bubble (not the timestamp below it)
+  const bbl = div.querySelector('.msg-bbl');
+  if (!bbl) return;
   if (!badge) {
     badge = document.createElement('div');
     badge.className = 'msg-heart';
-    div.appendChild(badge);
+    bbl.appendChild(badge);
   }
   const prev = badge.dataset.count;
   badge.dataset.count = hearts.length;
-  badge.innerHTML = (iLiked ? '❤️' : '🤍') + (hearts.length > 1 ? ` <span>${hearts.length}</span>` : '');
+  // Always use red heart emoji regardless of who liked it
+  badge.innerHTML = '❤️' + (hearts.length > 1 ? ` <span>${hearts.length}</span>` : '');
   if (prev !== String(hearts.length)) { badge.classList.remove('pop'); void badge.offsetWidth; badge.classList.add('pop'); }
 }
 
@@ -2130,41 +2187,43 @@ function initKeyboard() {
 
   if (!window.visualViewport) return;
 
-  // When the virtual keyboard appears on mobile:
-  // - Move the entire ccol up by the keyboard height using translateY
-  // - This way the video above stays visible (not pushed off screen)
-  // - The chat input sticks right above the keyboard with no dead space
-  const ccol = $('ccol');
-  const wrap = $('chat-inp-wrap');
+  const app = $('app');
 
+  // Pin #app to the visual viewport at all times.
+  // This keeps both the video AND the chat input visible above the keyboard.
   function onVPResize() {
-    if (window.innerWidth >= 768) return; // desktop: do nothing
+    const vv  = window.visualViewport;
+    const top = Math.round(vv.offsetTop);
+    const h   = Math.round(vv.height);
+    // Fix the app to exactly the visible area
+    app.style.position = 'fixed';
+    app.style.top      = top + 'px';
+    app.style.left     = '0';
+    app.style.width    = '100%';
+    app.style.height   = h + 'px';
 
-    const vv      = window.visualViewport;
-    const winH    = window.innerHeight;
-    const vvTop   = vv.offsetTop;
-    const vvH     = vv.height;
-
-    // Keyboard height = window height minus viewport height minus viewport top offset
-    const kbH = Math.max(0, winH - vvTop - vvH);
-
-    if (kbH > 50) {
-      // Keyboard is open: shift ccol up, remove safe-area bottom pad
-      ccol.style.transform    = `translateY(-${kbH}px)`;
-      ccol.style.marginBottom = `-${kbH}px`;  // prevent layout gap
-      wrap.style.paddingBottom = '8px';         // no safe-area when kb open
-    } else {
-      // Keyboard closed: restore
-      ccol.style.transform     = '';
-      ccol.style.marginBottom  = '';
-      wrap.style.paddingBottom = '';            // CSS env() takes over again
-    }
-
-    $('msgs').scrollTop = $('msgs').scrollHeight;
+    // Scroll messages to bottom when keyboard opens/closes
+    const msgs = $('msgs');
+    if (msgs) requestAnimationFrame(() => { msgs.scrollTop = msgs.scrollHeight; });
   }
 
   window.visualViewport.addEventListener('resize', onVPResize);
   window.visualViewport.addEventListener('scroll', onVPResize);
+
+  // Fix for "input not above keyboard on quick re-focus":
+  // When textarea is focused, force a layout recalculation after a small delay
+  const ta = $('chat-ta');
+  if (ta) {
+    ta.addEventListener('focus', () => {
+      setTimeout(() => {
+        onVPResize();
+        ta.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+      }, 200);
+    });
+  }
+
+  // Initial call
+  onVPResize();
 }
 
 </script>
