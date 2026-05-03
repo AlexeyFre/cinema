@@ -213,10 +213,12 @@ body {
     border-left: 1px solid var(--border);
   }
   /* Compact chat chrome to maximize message area */
-  #status-bar    { display: none; }
-  #react-bar     { display: none; }
-  #quick-phrases { display: none; }
-  #chat-hdr    { padding: 5px 12px 4px; }
+  #status-bar       { display: none; }
+  #react-bar        { display: none; }
+  #quick-phrases    { display: none; }
+  #typing-indicator { display: none; }
+  #chat-inp-wrap    { padding-top: 4px; padding-bottom: 4px; }
+  #chat-hdr         { padding: 5px 12px 4px; }
   .ch-title    { font-size: 12px; margin-bottom: 0; }
   .ch-sub      { font-size: 9px; }
   /* Chat-only in landscape: full width */
@@ -769,6 +771,7 @@ body {
 #app.kb-open #quick-phrases   { display: none !important; }
 #app.kb-open #typing-indicator{ min-height: 0; padding: 0 12px 2px; }
 #app.kb-open #chat-hdr        { padding: 4px 12px 3px; }
+#app.kb-open #vcol            { flex: 0 0 280px; }
 
 /* ── Reply preview strip (above input) ── */
 #reply-preview {
