@@ -12,346 +12,886 @@
 
 /* ── TOKENS ─────────────────────────────────────────── */
 :root {
-  --bg: #09090f;
-  --s1: #0f0f1b;
-  --s2: #161624;
-  --s3: #1e1e2e;
-  --border: rgba(255,255,255,.07);
+  --bg:      #09090f;
+  --s1:      #0f0f1b;
+  --s2:      #161624;
+  --s3:      #1e1e2e;
+  --border:  rgba(255,255,255,.07);
   --border2: rgba(255,255,255,.13);
-  --accent: #c9956e;
+  --accent:  #c9956e;
   --accent2: #e8c09a;
-  --text: #ece8e0;
-  --dim: #7a7568;
-  --muted: #3a3830;
-  --red: #c96e6e;
-  --green: #6ec9a0;
-  --chat-w: 300px;
+  --text:    #ece8e0;
+  --dim:     #7a7568;
+  --muted:   #3a3830;
+  --red:     #c96e6e;
+  --green:   #6ec9a0;
+  --chat-w:  300px;
   --topbar-h: 42px;
   --vttbar-h: 32px;
+  --ctrl-h:   0px; /* controls now overlay */
 }
 
 /* ── RESET ──────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { height: 100%; height: 100dvh; overflow: hidden; }
+
+html {
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
 body {
-  height: 100%; height: 100dvh; overflow: hidden;
-  background: var(--bg); color: var(--text);
-  font-family: 'DM Mono', monospace; font-size: 13px;
-  -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
-  user-select: none; -webkit-user-select: none;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-/* ── LOCK SCREEN ────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════
+   LOCK SCREEN
+═══════════════════════════════════════════════════════ */
 #lock {
-  position: fixed; inset: 0; z-index: 9999; background: var(--bg);
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
   display: flex; align-items: center; justify-content: center;
-  padding: 20px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 20px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .lock-glow {
   position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse 70% 50% at 50% 40%, rgba(201,149,110,.1) 0%, transparent 70%);
+  background: radial-gradient(ellipse 70% 50% at 50% 40%,
+    rgba(201,149,110,.1) 0%, transparent 70%);
 }
 .lock-box {
-  position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center;
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; align-items: center;
   gap: 24px; width: 100%; max-width: 310px;
 }
 .lock-icon { font-size: 42px; animation: hb 2.5s ease-in-out infinite; }
 @keyframes hb { 0%,100%{transform:scale(1);opacity:.65} 50%{transform:scale(1.18);opacity:1} }
 .lock-title {
-  font-family: 'Cormorant Garamond', serif; font-size: 34px; font-weight: 300; font-style: italic;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 34px; font-weight: 300; font-style: italic;
   color: var(--accent); text-align: center; line-height: 1.1;
 }
-.lock-sub { font-size: 10px; color: var(--dim); letter-spacing: .18em; text-transform: uppercase; }
+.lock-sub {
+  font-size: 10px; color: var(--dim);
+  letter-spacing: .18em; text-transform: uppercase;
+}
 .lock-fields { width: 100%; display: flex; flex-direction: column; gap: 12px; }
-.field-lbl { font-size: 9px; color: var(--dim); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 5px; }
+.field-lbl {
+  font-size: 9px; color: var(--dim);
+  letter-spacing: .14em; text-transform: uppercase;
+  margin-bottom: 5px;
+}
 .field-input {
-  width: 100%; background: var(--s2); border: 1px solid var(--border); border-radius: 10px;
-  padding: 12px 15px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 14px;
+  width: 100%; background: var(--s2);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 15px; color: var(--text);
+  font-family: 'DM Mono', monospace; font-size: 14px;
   outline: none; -webkit-appearance: none; appearance: none;
   transition: border-color .2s, box-shadow .2s;
   user-select: text; -webkit-user-select: text;
 }
-.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(201,149,110,.12); }
+.field-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(201,149,110,.12);
+}
 .field-input::placeholder { color: var(--muted); }
 .room-row { display: flex; gap: 8px; align-items: center; }
 .room-row .field-input { flex: 1; }
 .dice-btn {
-  background: var(--s3); border: 1px solid var(--border2); border-radius: 10px; padding: 12px 13px;
-  font-size: 17px; cursor: pointer; flex-shrink: 0; transition: border-color .2s; -webkit-appearance: none;
+  background: var(--s3); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 12px 13px;
+  font-size: 17px; cursor: pointer; flex-shrink: 0;
+  transition: border-color .2s; -webkit-appearance: none;
 }
 .dice-btn:hover { border-color: var(--accent); }
 .lock-enter {
   width: 100%; background: linear-gradient(135deg, var(--accent), var(--accent2));
-  border: none; border-radius: 10px; padding: 14px; color: var(--bg); font-family: 'DM Mono', monospace;
-  font-size: 12px; letter-spacing: .18em; text-transform: uppercase; cursor: pointer; -webkit-appearance: none;
+  border: none; border-radius: 10px; padding: 14px;
+  color: var(--bg); font-family: 'DM Mono', monospace;
+  font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+  cursor: pointer; -webkit-appearance: none;
   transition: opacity .2s, transform .1s;
 }
 .lock-enter:active { transform: scale(.97); opacity: .88; }
 .lock-err { font-size: 11px; color: var(--red); text-align: center; min-height: 16px; }
+.lock-note {
+  font-size: 10px; color: var(--muted); text-align: center;
+  line-height: 1.75; border-top: 1px solid var(--border);
+  padding-top: 16px; width: 100%;
+}
+.lock-note b { color: var(--dim); }
 
-/* ── APP SHELL ──────────────────────────────────────── */
-#app { display: none; width: 100%; height: 100%; height: 100dvh; }
+.faq-btn {
+  background: none; border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 16px;
+  color: var(--dim); font-family: 'DM Mono', monospace; font-size: 11px;
+  cursor: pointer; -webkit-appearance: none;
+  transition: color .15s, border-color .15s;
+  align-self: center; margin-top: 2px;
+}
+.faq-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ═══════════════════════════════════════════════════════
+   APP SHELL
+═══════════════════════════════════════════════════════ */
+#app {
+  display: none;
+  width: 100%; height: 100%;
+  height: 100dvh;
+}
 #app.on { display: flex; }
 
-/* DESKTOP */
+/* DESKTOP: side by side */
 @media (min-width: 768px) {
   #app { flex-direction: row; }
   #vcol { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
   #ccol {
-    width: var(--chat-w); flex-shrink: 0; display: flex; flex-direction: column;
-    background: var(--s1); border-left: 1px solid var(--border); overflow: hidden;
+    width: var(--chat-w); flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: var(--s1); border-left: 1px solid var(--border);
+    overflow: hidden;
   }
+  #m-handle, #peek-row, #backdrop { display: none !important; }
+  /* Chat-only mode on desktop: full width chat */
   #app.chat-only #vcol { display: none; }
   #app.chat-only #ccol { width: 100%; border-left: none; }
 }
 
-/* MOBILE PORTRAIT */
+/* MOBILE: stacked layout — player on top, chat always visible below */
 @media (max-width: 767px) {
   #app { flex-direction: column; }
+
+  /* Video column: fixed 42% of screen height */
   #vcol {
-    flex: 0 0 auto; max-height: 42dvh;
+    flex: 0 0 42dvh;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* Chat column: fills remaining space, always visible */
+  #ccol {
+    flex: 1;
+    display: flex; flex-direction: column;
+    background: var(--s1);
+    border-top: 1px solid var(--border);
+    overflow: hidden;
+    /* No drawer transform — always shown */
+  }
+
+  /* Hide drawer-specific elements */
+  #m-handle, #peek-row, #backdrop { display: none !important; }
+
+  /* Show desktop chat header on mobile too (shows partner status) */
+  #chat-hdr { display: block; }
+
+  /* Chat only mode: full height for chat */
+  #app.chat-only #vcol  { display: none; }
+  #app.chat-only #ccol  { flex: 1; border-top: none; }
+}
+
+/* MOBILE LANDSCAPE: side-by-side layout like desktop */
+@media (max-width: 767px) and (orientation: landscape) {
+  #app { flex-direction: row; }
+  #vcol {
+    flex: 0 0 52%;
+    height: 100%;
     display: flex; flex-direction: column; overflow: hidden;
   }
   #ccol {
-    flex: 1; display: flex; flex-direction: column; background: var(--s1);
-    border-top: 1px solid var(--border); overflow: hidden;
+    flex: 1;
+    height: 100%;
+    border-top: none;
+    border-left: 1px solid var(--border);
   }
-  #app.chat-only #vcol { display: none; }
-  #app.chat-only #ccol { flex: 1; border-top: none; }
-}
-
-/* MOBILE LANDSCAPE */
-@media (max-width: 767px) and (orientation: landscape) {
-  #app { flex-direction: row; }
-  #vcol { flex: 0 0 52%; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
-  #ccol { flex: 1; height: 100%; border-top: none; border-left: 1px solid var(--border); }
+  /* Compact chat chrome to maximize message area */
+  #status-bar  { display: none; }
+  #react-bar   { padding: 4px 10px 0; }
+  .rb          { padding: 3px 6px; font-size: 13px; }
+  #quick-phrases { display: none; }
+  #chat-hdr    { padding: 5px 12px 4px; }
+  .ch-title    { font-size: 12px; margin-bottom: 0; }
+  .ch-sub      { font-size: 9px; }
+  /* Chat-only in landscape: full width */
   #app.chat-only #vcol { display: none; }
   #app.chat-only #ccol { flex: 1; border-left: none; }
-  
-  #status-bar, #quick-phrases { display: none !important; }
-  #react-bar { padding: 4px 5px; }
-  #chat-hdr { display: none; }
 }
 
-/* Хак для клавиатуры на мобилках */
-body.typing-mode #quick-phrases { display: none !important; }
-body.typing-mode #react-bar { display: none !important; }
-body.typing-mode #vcol { max-height: 25dvh !important; }
-
-/* ── TOP BAR (Video controls) ───────────────────────── */
+/* ═══════════════════════════════════════════════════════
+   TOP BAR
+═══════════════════════════════════════════════════════ */
 #topbar {
-  height: var(--topbar-h); display: flex; align-items: center; gap: 8px; padding: 0 10px;
-  background: var(--s1); border-bottom: 1px solid var(--border); flex-shrink: 0; overflow: hidden;
+  height: var(--topbar-h);
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 10px;
+  background: var(--s1); border-bottom: 1px solid var(--border);
+  flex-shrink: 0; overflow: hidden;
 }
+.brand {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 16px; font-weight: 300; font-style: italic;
+  color: var(--accent); white-space: nowrap; flex-shrink: 0;
+}
+.room-badge {
+  font-size: 9px; color: var(--muted); letter-spacing: .08em;
+  background: var(--s3); border-radius: 4px; padding: 3px 7px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.room-badge b { color: var(--dim); }
 #url-inp {
-  flex: 1; min-width: 0; background: var(--s2); border: 1px solid var(--border);
-  border-radius: 7px; padding: 6px 10px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 11px;
-  outline: none; -webkit-appearance: none; appearance: none; user-select: text; -webkit-user-select: text;
+  flex: 1; min-width: 0;
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 7px; padding: 6px 10px;
+  color: var(--text); font-family: 'DM Mono', monospace; font-size: 11px;
+  outline: none; -webkit-appearance: none; appearance: none;
+  transition: border-color .2s;
+  user-select: text; -webkit-user-select: text;
 }
 #url-inp:focus { border-color: var(--accent); }
+#url-inp::placeholder { color: var(--muted); }
 #load-btn {
-  background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; border-radius: 7px; padding: 6px 11px;
-  color: var(--bg); font-family: 'DM Mono', monospace; font-size: 11px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none; border-radius: 7px; padding: 6px 11px;
+  color: var(--bg); font-family: 'DM Mono', monospace; font-size: 11px;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0; -webkit-appearance: none;
+  transition: opacity .15s;
 }
-#clear-btn { background: none; border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; color: var(--dim); cursor: pointer; }
-#force-sync-btn { background: none; border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; color: var(--dim); cursor: pointer; }
+#load-btn:active { opacity: .8; }
 
-/* ── VTT BAR ────────────────────────────────────────── */
+#clear-btn {
+  background: none; border: 1px solid var(--border);
+  border-radius: 7px; padding: 6px 9px;
+  color: var(--dim); font-size: 12px; cursor: pointer;
+  flex-shrink: 0; -webkit-appearance: none;
+  transition: color .15s, border-color .15s;
+}
+#clear-btn:hover  { color: var(--red); border-color: var(--red); }
+#clear-btn:active { opacity: .7; }
+
+#force-sync-btn {
+  background: none; border: 1px solid var(--border);
+  border-radius: 7px; padding: 6px 9px;
+  color: var(--dim); font-size: 14px; cursor: pointer;
+  flex-shrink: 0; -webkit-appearance: none;
+  transition: color .15s, border-color .15s, transform .3s;
+}
+#force-sync-btn:hover  { color: var(--accent); border-color: var(--accent); }
+#force-sync-btn.syncing { animation: spinSync .6s linear; }
+@keyframes spinSync { to { transform: rotate(360deg); } }
+
+/* ── VTT bar ── */
 #vttbar {
-  height: var(--vttbar-h); display: flex; align-items: center; gap: 8px; padding: 0 10px;
-  background: var(--s1); border-bottom: 1px solid var(--border); flex-shrink: 0;
+  height: var(--vttbar-h);
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 10px;
+  background: var(--s1); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
-#vtt-inp { flex: 1; background: transparent; border: none; border-bottom: 1px solid var(--border); color: var(--text); font-size: 11px; outline: none; user-select: text;}
-#vtt-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 3px 9px; color: var(--dim); cursor: pointer; font-size: 10px;}
+#vttbar label { font-size: 9px; color: var(--dim); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
+#vtt-inp {
+  flex: 1; min-width: 0; background: transparent;
+  border: none; border-bottom: 1px solid var(--border);
+  padding: 2px 4px; color: var(--text);
+  font-family: 'DM Mono', monospace; font-size: 11px; outline: none;
+  -webkit-appearance: none; appearance: none;
+  transition: border-bottom-color .2s;
+  user-select: text; -webkit-user-select: text;
+}
+#vtt-inp:focus { border-bottom-color: var(--accent); }
+#vtt-inp::placeholder { color: var(--muted); }
+#vtt-btn {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  padding: 3px 9px; color: var(--dim); font-family: 'DM Mono', monospace;
+  font-size: 10px; cursor: pointer; flex-shrink: 0; -webkit-appearance: none;
+  transition: color .15s, border-color .15s;
+}
+#vtt-btn:hover { color: var(--accent); border-color: var(--accent); }
 
-/* ── PLAYER ─────────────────────────────────────────── */
-#player-wrap { flex: 1; position: relative; background: #000; overflow: hidden; min-height: 0; cursor: pointer; }
-#ph { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
-#vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; }
-#yt-wrap { position: absolute; inset: 0; display: none; }
+/* ═══════════════════════════════════════════════════════
+   PLAYER
+═══════════════════════════════════════════════════════ */
+#player-wrap {
+  flex: 1; position: relative;
+  background: #000; overflow: hidden;
+  min-height: 0;
+  /* Tap anywhere to toggle controls */
+  cursor: pointer;
+}
+
+/* Placeholder */
+#ph {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 10px; text-align: center; padding: 24px;
+  pointer-events: none;
+}
+.ph-icon { font-size: 48px; opacity: .2; }
+.ph-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px; font-weight: 300; font-style: italic; color: var(--dim);
+}
+.ph-sub { font-size: 11px; color: var(--muted); line-height: 1.7; }
+
+/* Native video */
+#vid {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: contain;
+  display: none;
+}
+
+/* YouTube wrapper */
+#yt-wrap {
+  position: absolute; inset: 0;
+  display: none;
+}
 #yt-wrap.on { display: block; }
 #yt-inner { width: 100%; height: 100%; }
-#yt-shield { position: absolute; inset: 0; z-index: 2; cursor: pointer; }
-
-/* ── CONTROLS OVERLAY ───────────────────────────────── */
-#ctrl-overlay {
-  position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column; justify-content: flex-end;
-  background: linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.35) 35%, transparent 65%);
-  transition: opacity .3s; pointer-events: none;
+/* Transparent shield to intercept clicks (we handle play/pause) */
+#yt-shield {
+  position: absolute; inset: 0; z-index: 2; cursor: pointer;
 }
+
+/* Overlay: gradient + controls */
+#ctrl-overlay {
+  position: absolute; inset: 0; z-index: 10;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,.82) 0%,
+    rgba(0,0,0,.35) 35%,
+    transparent 65%
+  );
+  transition: opacity .3s;
+  /* Overlay itself never captures events — only children opt-in */
+  pointer-events: none;
+}
+/* HIDDEN: nothing inside overlay is clickable — first touch only shows UI */
 #ctrl-overlay.hidden { opacity: 0; }
 #ctrl-overlay.hidden * { pointer-events: none !important; }
+
+/* VISIBLE: ctrl-bar and centre-btn are interactive */
 #ctrl-overlay:not(.hidden) #ctrl-bar { pointer-events: all; }
 #ctrl-overlay:not(.hidden) #centre-btn { pointer-events: all; }
 
+/* Centre play/pause button — synced visibility with ctrl-overlay */
 #centre-btn {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 15;
-  width: 64px; height: 64px; border-radius: 50%; background: rgba(0,0,0,.52); border: 2px solid rgba(255,255,255,.25);
-  backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: none;
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.52);
+  border: 2px solid rgba(255,255,255,.25);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  /* pointer-events controlled by parent .hidden rule above */
+  pointer-events: none;
+  transition: opacity .3s, transform .15s, background .15s;
+  -webkit-user-select: none; user-select: none;
+  -webkit-appearance: none; appearance: none;
 }
+#centre-btn:hover { background: rgba(0,0,0,.7); border-color: rgba(255,255,255,.45); }
+#centre-btn:active { transform: translate(-50%, -50%) scale(.88); }
+
+/* Sync + user pills */
+#sync-pill {
+  position: absolute; top: 10px; left: 10px; z-index: 11;
+  background: rgba(9,9,15,.82); backdrop-filter: blur(8px);
+  border: 1px solid var(--border); border-radius: 20px;
+  padding: 4px 10px; font-size: 10px; letter-spacing: .07em;
+  display: flex; align-items: center; gap: 6px;
+  pointer-events: none;
+}
+.sdot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 6px var(--green);
+  animation: blink 2s infinite;
+}
+.sdot.warn { background: #d4af6e; box-shadow: 0 0 6px #d4af6e; }
+.sdot.err  { background: var(--red); box-shadow: 0 0 6px var(--red); animation: none; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+#user-pill {
+  position: absolute; top: 10px; right: 10px; z-index: 11;
+  background: rgba(9,9,15,.82); backdrop-filter: blur(8px);
+  border: 1px solid var(--border); border-radius: 20px;
+  padding: 4px 10px; font-size: 10px; color: var(--accent);
+  pointer-events: none;
+}
+
+/* Progress bar */
 #ctrl-bar { padding: 28px 14px 12px; }
-#prog-wrap { width: 100%; height: 22px; display: flex; align-items: center; position: relative; cursor: pointer; margin-bottom: 8px; }
-#prog-track { width: 100%; height: 3px; background: rgba(255,255,255,.18); border-radius: 3px; position: relative; }
-#prog-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent2)); pointer-events: none; }
-#prog-thumb { position: absolute; top: 50%; left: 0%; width: 13px; height: 13px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); pointer-events: none; }
-#ctrl-row { display: flex; align-items: center; gap: 2px; }
-.cb { background: none; border: none; color: rgba(255,255,255,.88); font-size: 23px; cursor: pointer; padding: 5px 9px; }
-#time-lbl { font-size: 11px; color: rgba(255,255,255,.55); min-width: 94px; text-align: center; }
+#prog-wrap {
+  width: 100%; height: 22px;
+  display: flex; align-items: center;
+  position: relative; cursor: pointer;
+  touch-action: none; margin-bottom: 8px;
+}
+#prog-track {
+  width: 100%; height: 3px;
+  background: rgba(255,255,255,.18); border-radius: 3px; position: relative;
+}
+#prog-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 3px; pointer-events: none;
+}
+#prog-thumb {
+  position: absolute; top: 50%; left: 0%;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 5px rgba(0,0,0,.7);
+  transform: translate(-50%, -50%);
+  pointer-events: none; transition: transform .1s;
+}
+#prog-wrap.drag #prog-thumb { transform: translate(-50%, -50%) scale(1.35); }
+
+/* Controls row */
+#ctrl-row {
+  display: flex; align-items: center; gap: 2px;
+}
+.cb {
+  background: none; border: none; color: rgba(255,255,255,.88);
+  font-size: 23px; cursor: pointer; padding: 5px 9px;
+  border-radius: 7px; line-height: 1; flex-shrink: 0;
+  -webkit-user-select: none; user-select: none; -webkit-appearance: none;
+  transition: color .12s, background .12s;
+}
+.cb:hover { color: #fff; background: rgba(255,255,255,.1); }
+.cb:active { transform: scale(.86); }
+.cb.sm { font-size: 18px; }
+#time-lbl {
+  font-size: 11px; color: rgba(255,255,255,.55);
+  min-width: 94px; text-align: center; flex-shrink: 0; letter-spacing: .02em;
+}
 .sp { flex: 1; }
 #vol-wrap { display: flex; align-items: center; gap: 4px; margin-right: 18px; }
-#vol-range { width: 62px; cursor: pointer; }
+#vol-range {
+  -webkit-appearance: none; appearance: none; width: 62px; height: 3px;
+  background: rgba(255,255,255,.25); border-radius: 2px; outline: none; cursor: pointer;
+}
+#vol-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 11px; height: 11px;
+  border-radius: 50%; background: #fff;
+}
+/* Mobile: shrink volume slider so fs-btn never overflows */
+@media (max-width: 767px) {
+  #vol-range { width: 38px; }
+  #vol-wrap  { margin-right: 4px; }
+  #ctrl-row  { gap: 0; }
+  .cb        { padding: 5px 5px; }
+  .cb.sm     { padding: 4px 4px; }
+  /* Prevent iOS auto-zoom on inputs (requires font-size >= 16px) */
+  #url-inp, #vtt-inp { font-size: 16px; }
+}
 
-/* ── CHAT ───────────────────────────────────────────── */
-#chat-hdr { padding: 13px 13px 9px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.ch-title { font-family: 'Cormorant Garamond', serif; font-size: 15px; font-style: italic; color: var(--accent); margin-bottom: 3px; }
+/* ═══════════════════════════════════════════════════════
+   CHAT COLUMN
+═══════════════════════════════════════════════════════ */
+/* Mobile handle + peek */
+#m-handle {
+  display: flex; align-items: center; justify-content: center;
+  padding: 10px 0 4px; flex-shrink: 0; cursor: pointer;
+}
+.drag-bar { width: 34px; height: 3.5px; background: var(--border2); border-radius: 2px; }
+#peek-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px 10px; flex-shrink: 0; cursor: pointer;
+}
+.peek-label {
+  font-size: 11px; color: var(--dim); letter-spacing: .1em;
+  text-transform: uppercase; display: flex; align-items: center; gap: 7px;
+}
+#unread-badge {
+  background: var(--accent); color: var(--bg);
+  border-radius: 10px; padding: 1px 6px; font-size: 10px; display: none;
+}
+#unread-badge.on { display: inline-block; }
+.peek-hint { font-size: 10px; color: var(--muted); }
 
-#status-bar { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 5px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; align-items: center; }
-.sb-item { font-size: 10px; color: var(--dim); }
-.sb-item b { color: var(--accent); }
+/* Desktop header */
+#chat-hdr {
+  padding: 13px 13px 9px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.ch-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 15px; font-style: italic; color: var(--accent); margin-bottom: 3px;
+}
+.ch-sub { font-size: 10px; color: var(--muted); letter-spacing: .07em; }
+/* Mobile: make chat header more compact */
+@media (max-width: 767px) {
+  #chat-hdr { padding: 8px 12px 6px; }
+  .ch-title  { font-size: 13px; margin-bottom: 1px; }
+}
+.odot {
+  display: inline-block; width: 5px; height: 5px;
+  border-radius: 50%; background: var(--green);
+  box-shadow: 0 0 4px var(--green);
+  margin-right: 5px; animation: blink 2s infinite;
+}
 
-#react-bar { display: flex; gap: 5px; padding: 7px 10px 0; flex-shrink: 0; }
-.rb { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 15px; cursor: pointer; }
+/* Reactions */
+#react-bar {
+  display: flex; gap: 5px; padding: 7px 10px 0; flex-shrink: 0;
+}
+.rb {
+  background: none; border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 8px;
+  font-size: 15px; cursor: pointer; -webkit-appearance: none;
+  transition: border-color .12s, transform .1s, background .12s;
+}
+.rb:hover { border-color: var(--accent); background: rgba(201,149,110,.08); }
+.rb:active { transform: scale(.8); }
 
-#msgs { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px; display: flex; flex-direction: column; gap: 7px; min-height: 0; scroll-behavior: smooth; }
+/* Messages list */
+#msgs {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: 10px; display: flex; flex-direction: column; gap: 7px;
+  min-height: 0; scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+#msgs::-webkit-scrollbar { width: 3px; }
+#msgs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
 .msg { max-width: 85%; display: flex; flex-direction: column; gap: 2px; position: relative; }
-.msg.me { align-self: flex-end; align-items: flex-end; }
-.msg.them { align-self: flex-start; align-items: flex-start; }
+.msg.me  { align-self: flex-end;   align-items: flex-end; }
+.msg.them{ align-self: flex-start; align-items: flex-start; }
 .msg.sys { align-self: center; max-width: 100%; align-items: center; }
-
-.msg-hdr { display: flex; align-items: center; gap: 5px; padding: 0 3px; }
-.msg-name { font-size: 9px; color: var(--dim); letter-spacing: .05em; }
-.reply-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 10px; padding: 2px; }
-.reply-btn:hover { color: var(--accent); }
-
-.msg-bbl { padding: 8px 11px; border-radius: 13px; font-size: 13px; line-height: 1.5; word-break: break-word; user-select: text; position: relative; }
-.msg.me .msg-bbl { background: rgba(201,149,110,.22); border: 1px solid rgba(201,149,110,.22); border-bottom-right-radius: 4px; }
+.msg-name { font-size: 9px; color: var(--dim); letter-spacing: .05em; padding: 0 3px; }
+.msg-bbl {
+  padding: 8px 11px; border-radius: 13px;
+  font-size: 13px; line-height: 1.5;
+  word-break: break-word;
+  user-select: text; -webkit-user-select: text;
+  position: relative; /* needed for heart badge positioning */
+}
+.msg.me   .msg-bbl { background: rgba(201,149,110,.22); border: 1px solid rgba(201,149,110,.22); border-bottom-right-radius: 4px; }
 .msg.them .msg-bbl { background: var(--s2); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.msg.sys  .msg-bbl { background: none; border: none; color: var(--dim); font-size: 10px; font-style: italic; padding: 2px 6px; text-align: center; }
 .msg-time { font-size: 9px; color: var(--muted); padding: 0 3px; }
 
-/* ── REPLIES ── */
-.msg-reply-block {
-  background: rgba(0,0,0,0.25); border-left: 2px solid var(--accent);
-  padding: 4px 8px; margin-bottom: 4px; border-radius: 4px; font-size: 11px; cursor: pointer;
+/* ── Message heart reaction (TikTok-style) ── */
+.msg-react-wrap {
+  position: relative; align-self: flex-end;
 }
-.msg.me .msg-reply-block { background: rgba(0,0,0,0.15); }
-.msg-reply-name { font-weight: bold; color: var(--accent); margin-bottom: 2px; }
-.msg-reply-text { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
-
-#reply-preview {
-  display: none; background: var(--s2); border-left: 3px solid var(--accent);
-  padding: 8px 12px; font-size: 11px; color: var(--dim); flex-shrink: 0;
-  justify-content: space-between; align-items: center;
-}
-#reply-preview.active { display: flex; }
-#reply-preview-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#reply-cancel { cursor: pointer; font-size: 14px; padding: 0 5px; color: var(--muted); }
-
-/* ── HEARTS (DOUBLE TAP REACTIONS) ── */
 .msg-heart {
-  position: absolute; 
-  bottom: -6px; /* Залезает на пузырь, а не висит под ним */
-  background: var(--s1); 
-  border: 1px solid var(--border);
-  border-radius: 20px; 
-  padding: 1px 5px; 
-  font-size: 11px; 
-  display: flex; 
-  align-items: center; 
-  gap: 2px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.4); 
+  position: absolute; bottom: -10px; right: 6px;
+  background: var(--s1); border: 1px solid var(--border);
+  border-radius: 20px; padding: 1px 5px;
+  font-size: 11px; display: flex; align-items: center; gap: 2px;
+  white-space: nowrap; pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,.4);
+  transition: transform .15s;
   z-index: 2;
 }
-.msg.me .msg-heart { right: 6px; left: auto; }
-.msg.them .msg-heart { left: 6px; right: auto; }
-
 .msg-heart.pop { animation: heartPop .3s ease-out; }
-@keyframes heartPop { 0% { transform: scale(1); } 50% { transform: scale(1.45); } 100% { transform: scale(1); } }
+@keyframes heartPop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.45); }
+  100% { transform: scale(1); }
+}
+/* Align heart to the right on "me" bubbles, left on "them" bubbles */
+.msg.me .msg-bbl .msg-heart   { right: 6px; left: auto; }
+.msg.them .msg-bbl .msg-heart { left: 6px; right: auto; }
 
-/* Вспышка пузыря при двойном тапе */
-.tap-flash { animation: bblFlash .25s ease; }
-@keyframes bblFlash { 0% { opacity: 1; filter: brightness(1); } 50% { opacity: .6; filter: brightness(1.5); } 100%{ opacity: 1; filter: brightness(1); } }
+/* double-tap feedback flash */
+.msg-bbl.tap-flash { animation: bblFlash .25s ease; }
+@keyframes bblFlash {
+  0%  { opacity: 1; }
+  50% { opacity: .55; }
+  100%{ opacity: 1; }
+}
 
-/* Всплывающие смайлики от реакций сверху */
-.floater { position: fixed; font-size: 26px; pointer-events: none; z-index: 9000; animation: floatUp 1.5s ease-out forwards; }
-@keyframes floatUp { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-120px) scale(1.5); opacity: 0; } }
+/* Typing indicator */
+#typing-indicator {
+  padding: 0 12px 5px;
+  font-size: 10px; color: var(--accent);
+  letter-spacing: .06em; min-height: 18px;
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+}
+.typing-dots span {
+  display: inline-block; width: 4px; height: 4px;
+  border-radius: 50%; background: var(--accent);
+  animation: tdot 1.2s infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: .2s; }
+.typing-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes tdot {
+  0%,80%,100% { transform: scale(.6); opacity: .4; }
+  40%          { transform: scale(1);  opacity: 1;  }
+}
 
-/* ── MISC ── */
-#typing-indicator { padding: 0 12px 5px; font-size: 10px; color: var(--accent); min-height: 18px; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-#quick-phrases { display: flex; gap: 5px; flex-wrap: wrap; padding: 6px 10px 2px; flex-shrink: 0; }
-.qp-btn { background: var(--s3); border: 1px solid var(--border); border-radius: 8px; padding: 4px 9px; font-size: 11px; color: var(--dim); cursor: pointer; }
+/* Chat input */
+#chat-inp-wrap {
+  display: flex; align-items: flex-end; gap: 7px;
+  padding: 8px 10px;
+  /* Safe area for iOS home bar */
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border); background: var(--s1); flex-shrink: 0;
+}
+#chat-ta {
+  flex: 1; background: var(--s2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 11px;
+  color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px;
+  line-height: 1.45; resize: none; outline: none; max-height: 90px; overflow-y: auto;
+  -webkit-appearance: none; appearance: none;
+  transition: border-color .2s;
+  user-select: text; -webkit-user-select: text;
+}
+#chat-ta:focus { border-color: rgba(201,149,110,.38); }
+#chat-ta::placeholder { color: var(--muted); }
+#send-btn {
+  width: 38px; height: 38px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none; border-radius: 10px; font-size: 14px; color: var(--bg);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  -webkit-appearance: none; transition: opacity .15s, transform .1s;
+}
+#send-btn:active { transform: scale(.87); opacity: .85; }
 
-#chat-inp-wrap { display: flex; align-items: flex-end; gap: 7px; padding: 8px 10px; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border); background: var(--s1); flex-shrink: 0; }
-#chat-ta { flex: 1; background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 11px; color: var(--text); font-family: inherit; font-size: 13px; line-height: 1.45; resize: none; outline: none; max-height: 90px; }
-#send-btn { width: 38px; height: 38px; flex-shrink: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; border-radius: 10px; color: var(--bg); cursor: pointer; }
+/* ── Floating reactions ── */
+.floater {
+  position: fixed; font-size: 26px; pointer-events: none; z-index: 9000;
+  animation: floatUp 1.5s ease-out forwards;
+}
+@keyframes floatUp {
+  0%   { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-120px) scale(1.5); opacity: 0; }
+}
 
-#toast { position: fixed; bottom: 68px; left: 50%; transform: translateX(-50%) translateY(10px); background: var(--s2); border: 1px solid var(--border2); border-radius: 8px; padding: 8px 16px; font-size: 12px; color: var(--dim); opacity: 0; z-index: 9999; pointer-events: none; transition: .25s; }
+/* ═══════════════════════════════════════════════════════
+   CHAT-ONLY MODE (controller mode)
+═══════════════════════════════════════════════════════ */
+#app.chat-only #vcol { display: none !important; }
+#app.chat-only #ccol {
+  position: static !important;
+  width: 100% !important; height: 100dvh !important;
+  transform: none !important; border-radius: 0 !important;
+  border-top: none !important;
+}
+#app.chat-only #backdrop  { display: none !important; }
+#app.chat-only #m-handle  { display: none !important; }
+#app.chat-only #peek-row  { display: none !important; }
+#app.chat-only #chat-hdr  { display: block !important; }
+
+/* chat-only checkbox */
+.chat-only-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 2px 0;
+}
+.chat-only-row input[type=checkbox] {
+  width: 16px; height: 16px;
+  accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
+}
+.chat-only-row label {
+  font-size: 11px; color: var(--dim);
+  cursor: pointer; line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════════════
+   STATUS BAR (participant timecodes)
+═══════════════════════════════════════════════════════ */
+#status-bar {
+  display: flex; flex-wrap: wrap; gap: 4px 10px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; min-height: 24px;
+  align-items: center;
+}
+.sb-item {
+  font-size: 10px; color: var(--dim);
+  letter-spacing: .04em; white-space: nowrap;
+}
+.sb-item b { color: var(--accent); }
+
+/* ═══════════════════════════════════════════════════════
+   QUICK PHRASES
+═══════════════════════════════════════════════════════ */
+#quick-phrases {
+  display: flex; gap: 5px; flex-wrap: wrap;
+  padding: 6px 10px 2px;
+  flex-shrink: 0;
+}
+.qp-btn {
+  background: var(--s3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 9px;
+  font-size: 11px; color: var(--dim);
+  cursor: pointer; -webkit-appearance: none;
+  transition: border-color .12s, color .12s, background .12s;
+  white-space: nowrap;
+}
+.qp-btn:hover  { border-color: var(--accent); color: var(--accent); }
+.qp-btn:active { background: rgba(201,149,110,.1); transform: scale(.94); }
+
+/* ═══════════════════════════════════════════════════════
+   TAP-TO-PLAY overlay (iOS autoplay blocked)
+═══════════════════════════════════════════════════════ */
+#tap-to-play {
+  position: absolute; inset: 0; z-index: 30;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.45);
+  cursor: pointer;
+}
+#tap-to-play span {
+  background: rgba(9,9,15,.85);
+  border: 1px solid var(--accent);
+  border-radius: 14px; padding: 12px 22px;
+  font-size: 13px; color: var(--accent);
+  letter-spacing: .1em; pointer-events: none;
+}
+
+#toast {
+  position: fixed; bottom: 68px; left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--s2); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 8px 16px;
+  font-size: 12px; color: var(--dim);
+  pointer-events: none; opacity: 0;
+  transition: opacity .25s, transform .25s; z-index: 9999; white-space: nowrap;
+}
 #toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
-
 </style>
 </head>
 <body>
 
-<!-- LOCK SCREEN -->
+<!-- ════════════════════════════════════════════════════
+     LOCK SCREEN
+════════════════════════════════════════════════════ -->
 <div id="lock">
   <div class="lock-glow"></div>
   <div class="lock-box">
+    <div class="lock-icon">🎬</div>
     <div class="lock-title">Наш Кинотеатр</div>
     <div class="lock-sub">только для двоих</div>
+
     <div class="lock-fields">
       <div>
         <div class="field-lbl">Твоё имя</div>
-        <input class="field-input" id="li-name" type="text" placeholder="Как тебя зовут?" maxlength="20">
+        <input class="field-input" id="li-name" type="text"
+          placeholder="Как тебя зовут?" maxlength="20"
+          autocomplete="nickname" autocorrect="off" spellcheck="false">
       </div>
       <div>
         <div class="field-lbl">Код комнаты</div>
         <div class="room-row">
-          <input class="field-input" id="li-room" type="text" placeholder="Придумай" maxlength="20">
-          <button class="dice-btn" id="dice-btn">🎲</button>
+          <input class="field-input" id="li-room" type="text"
+            placeholder="Придумай или нажми 🎲" maxlength="20"
+            autocomplete="off" autocorrect="off" spellcheck="false">
+          <button class="dice-btn" id="dice-btn" title="Случайный код">🎲</button>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;line-height:1.6;">
+          Введи один и тот же код на обоих устройствах
         </div>
       </div>
       <div>
         <div class="field-lbl">Пароль</div>
-        <input class="field-input" id="li-pass" type="password" placeholder="••••••">
+        <input class="field-input" id="li-pass" type="password"
+          placeholder="••••••" autocomplete="current-password">
       </div>
     </div>
+
     <button class="lock-enter" id="enter-btn">Войти в кино →</button>
-    <div class="room-row">
-      <input type="checkbox" id="chat-only-cb"> <label for="chat-only-cb" style="font-size:11px;color:var(--dim)">Только чат</label>
+    <div class="chat-only-row">
+      <input type="checkbox" id="chat-only-cb">
+      <label for="chat-only-cb">Только чат</label>
     </div>
     <div class="lock-err" id="lock-err"></div>
+
+    <button class="faq-btn" id="faq-btn">? Как это работает</button>
+
+    <div class="lock-note">
+      <b>Где найти фильм?</b><br>
+      YouTube — вставь ссылку прямо<br>
+      MP4/M4V — прямая ссылка на файл<br>
+      <span style="color:var(--dim)">Оба устройства должны использовать<br>один и тот же код комнаты</span>
+    </div>
   </div>
 </div>
 
-<!-- APP -->
+<!-- FAQ Modal -->
+<div id="faq-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(9,9,15,.88);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;max-width:420px;width:100%;padding:24px;max-height:85dvh;overflow-y:auto;position:relative;">
+    <button id="faq-close" style="position:absolute;top:12px;right:14px;background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer;">✕</button>
+    <div style="font-size:16px;font-family:'Cormorant Garamond',serif;color:var(--accent);margin-bottom:16px;">Как пользоваться кинотеатром</div>
+    <div style="font-size:11px;color:var(--dim);line-height:1.85;display:flex;flex-direction:column;gap:12px;">
+      <div><b style="color:var(--text)">🚀 Начало просмотра</b><br>Оба участника вводят одинаковый код комнаты и пароль. Один из вас вставляет ссылку на YouTube или MP4 и нажимает «Загрузить». Видео автоматически загрузится у обоих.</div>
+      <div><b style="color:var(--text)">📱 Режим «Только чат»</b><br>Если на телефоне неудобно смотреть видео, поставь галочку «Только чат» — получишь только окно переписки без плеера. Идеально для партнёра.</div>
+      <div><b style="color:var(--text)">⏯ Синхронизация</b><br>Play и Pause синхронизируются автоматически. Сайт работает по принципу «по медленному» — если один из вас отстаёт, второй притормозит. Кнопка ⟳ принудительно синхронизирует всех к твоему текущему времени.</div>
+      <div><b style="color:var(--text)">💬 Чат</b><br>Пиши сообщения справа. Дважды нажми на любое сообщение — поставишь ❤️. Быстрые фразы над полем ввода — «Минуту», «Туалет», «Проблема».</div>
+      <div><b style="color:var(--text)">📺 YouTube</b><br>Вставь любую ссылку вида youtube.com/watch?v=... или youtu.be/... — видео загрузится с нативным плеером. На iPhone работает в полноэкранном режиме.</div>
+      <div><b style="color:var(--text)">🎬 Фильмы (MP4)</b><br>Нужна прямая ссылка на файл (заканчивается на .mp4). Google Drive и Dropbox для этого не подходят. Лучший бесплатный вариант — загрузить файл на сервис и получить прямую ссылку.</div>
+      <div><b style="color:var(--text)">⌨️ Горячие клавиши (ПК)</b><br>Пробел — play/pause · Стрелки — перемотка на 10с · F — полный экран · M — звук</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     APP
+════════════════════════════════════════════════════ -->
 <div id="app">
-  <!-- VIDEO COLUMN -->
+
+  <!-- ── VIDEO COLUMN ── -->
   <div id="vcol">
+
     <div id="topbar">
-      <div class="brand">Cinéma ❤️</div>
+      <div class="brand">Cinéma ❤</div>
+      <div class="room-badge">Комната: <b id="room-lbl">—</b></div>
       <input id="url-inp" type="url" placeholder="Ссылка на YouTube или mp4…">
       <button id="clear-btn" title="Сбросить видео" style="display:none">✕</button>
       <button id="load-btn">▶ Загрузить</button>
-      <button id="force-sync-btn">⟳</button>
+      <button id="force-sync-btn" title="Синхронизировать всех к моему времени">⟳</button>
     </div>
+
     <div id="vttbar">
-      <input id="vtt-inp" type="url" placeholder="Ссылка на .vtt (субтитры)…">
+      <label>Субтитры .vtt</label>
+      <input id="vtt-inp" type="url" placeholder="Ссылка на .vtt файл (необязательно)…">
       <button id="vtt-btn">ОК</button>
     </div>
+
     <div id="player-wrap">
+      <!-- Placeholder -->
       <div id="ph">
-        <div class="ph-title">Кинотеатр</div>
-        <div class="lock-sub">Вставьте ссылку выше</div>
+        <div class="ph-icon">🎬</div>
+        <div class="ph-title">Вставьте ссылку на фильм выше</div>
+        <div class="ph-sub">YouTube, MP4 или M4V</div>
       </div>
+
+      <!-- Native video -->
       <video id="vid" playsinline webkit-playsinline preload="metadata"></video>
-      <div id="yt-wrap"><div id="yt-inner"></div><div id="yt-shield"></div></div>
-      
+
+      <!-- YouTube -->
+      <div id="yt-wrap">
+        <div id="yt-inner"></div>
+        <div id="yt-shield"></div>
+      </div>
+
+      <!-- Controls overlay -->
       <div id="ctrl-overlay">
-        <button id="centre-btn">
-          <svg id="centre-icon" width="26" height="26" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21" /></svg>
+        <!-- Centre play/pause button -->
+        <button id="centre-btn" aria-label="Воспроизведение / Пауза">
+          <svg id="centre-icon" width="26" height="26" viewBox="0 0 24 24" fill="white">
+            <polygon points="5,3 19,12 5,21" />
+          </svg>
         </button>
         <div id="ctrl-bar">
           <div id="prog-wrap">
-            <div id="prog-track"><div id="prog-fill"></div><div id="prog-thumb"></div></div>
+            <div id="prog-track">
+              <div id="prog-fill"></div>
+              <div id="prog-thumb"></div>
+            </div>
           </div>
           <div id="ctrl-row">
             <button class="cb" id="play-btn">▶</button>
@@ -367,326 +907,1136 @@ body.typing-mode #vcol { max-height: 25dvh !important; }
           </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- CHAT COLUMN -->
+      <!-- Tap-to-play overlay for iOS -->
+      <div id="tap-to-play"><span>▶ Нажми, чтобы начать</span></div>
+
+      <!-- Sync pill -->
+      <div id="sync-pill">
+        <div class="sdot" id="sdot"></div>
+        <span id="slbl">Подключение…</span>
+      </div>
+      <!-- User pill -->
+      <div id="user-pill"></div>
+    </div><!-- /player-wrap -->
+
+  </div><!-- /vcol -->
+
+  <!-- ── DRAWER BACKDROP ── -->
+  <div id="backdrop"></div>
+
+  <!-- ── CHAT COLUMN ── -->
   <div id="ccol">
+
+    <!-- Mobile: drag handle + peek -->
+    <div id="m-handle"><div class="drag-bar"></div></div>
+    <div id="peek-row">
+      <div class="peek-label">
+        💬 Чат
+        <span id="unread-badge"></span>
+      </div>
+      <div class="peek-hint">↑ потяните</div>
+    </div>
+
+    <!-- Desktop: header -->
     <div id="chat-hdr">
       <div class="ch-title">Чат</div>
+      <div class="ch-sub"><span class="odot"></span><span id="partner-lbl">Ожидание партнёра…</span></div>
     </div>
+
+    <!-- Participant timecodes -->
     <div id="status-bar"></div>
+
+    <!-- Reactions -->
     <div id="react-bar">
       <button class="rb" data-e="❤️">❤️</button>
       <button class="rb" data-e="😂">😂</button>
       <button class="rb" data-e="😱">😱</button>
       <button class="rb" data-e="👏">👏</button>
       <button class="rb" data-e="🍿">🍿</button>
+      <button class="rb" data-e="💋">💋</button>
     </div>
+
+    <!-- Messages -->
     <div id="msgs"></div>
-    
+
+    <!-- Typing indicator -->
     <div id="typing-indicator"></div>
+
+    <!-- Quick phrases -->
     <div id="quick-phrases">
-      <button class="qp-btn" data-phrase="Минуту ⏸️">Минуту ⏸️</button>
+      <button class="qp-btn" data-phrase="Минуту ⏱">Минуту ⏱</button>
       <button class="qp-btn" data-phrase="Я в туалет 🚽">Я в туалет 🚽</button>
+      <button class="qp-btn" data-phrase="Подожди, проблема ⚠️">Подожди, проблема ⚠️</button>
     </div>
-    
-    <div id="reply-preview">
-      <div id="reply-preview-text"></div>
-      <div id="reply-cancel" onclick="cancelReply()">✕</div>
-    </div>
+
+    <!-- Input -->
     <div id="chat-inp-wrap">
       <textarea id="chat-ta" rows="1" placeholder="Сообщение…"></textarea>
       <button id="send-btn">➤</button>
     </div>
-  </div>
-</div>
+
+  </div><!-- /ccol -->
+
+</div><!-- /app -->
+
 <div id="toast"></div>
 
-<!-- SCRIPTS -->
+<!-- ════════════════════════════════════════════════════
+     SCRIPTS
+════════════════════════════════════════════════════ -->
 <script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, get, remove, onValue, push, serverTimestamp, onDisconnect } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+/* ─── Firebase imports ─────────────────────────────── */
+import { initializeApp }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import {
+  getDatabase, ref, set, get, remove, onValue, push,
+  serverTimestamp, onDisconnect
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
+/* ─── Config ──────────────────────────────────────── */
 const FB_CONFIG = {
-  apiKey: "AIzaSyBatXdgIXXW5c4VFibd24bhoAockReJPrE",
-  authDomain: "our-cinema-20c0f.firebaseapp.com",
-  databaseURL: "https://our-cinema-20c0f-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "our-cinema-20c0f",
-  storageBucket: "our-cinema-20c0f.firebasestorage.app",
+  apiKey:            "AIzaSyBatXdgIXXW5c4VFibd24bhoAockReJPrE",
+  authDomain:        "our-cinema-20c0f.firebaseapp.com",
+  databaseURL:       "https://our-cinema-20c0f-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "our-cinema-20c0f",
+  storageBucket:     "our-cinema-20c0f.firebasestorage.app",
   messagingSenderId: "970156344935",
-  appId: "1:970156344935:web:74ecce58fb40f4579636c2"
+  appId:             "1:970156344935:web:74ecce58fb40f4579636c2"
 };
-
 const PASSWORD = 'love123';
-const fbApp = initializeApp(FB_CONFIG);
-const db = getDatabase(fbApp);
+const SYNC_DRIFT   = 5;     // seconds before force-seek (allows natural drift)
+const CTRL_TIMEOUT = 2500;  // ms before controls auto-hide
+const HB_INTERVAL  = 5000;  // heartbeat ms
 
-/* ── HELPERS ── */
-const $ = id => document.getElementById(id);
-const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+/* ─── Firebase init ───────────────────────────────── */
+const fbApp = initializeApp(FB_CONFIG);
+const db    = getDatabase(fbApp);
+
+/* ─── Helpers ─────────────────────────────────────── */
+const $  = id => document.getElementById(id);
+const el = (tag, cls, html) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html !== undefined) e.innerHTML = html;
+  return e;
+};
+const esc = s => String(s||'')
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
 let toastTimer;
 function toast(msg, ms = 2500) {
-  const t = $('toast'); t.textContent = msg; t.classList.add('on');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), ms);
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), ms);
 }
 
-/* ── STATE ── */
+/* ─── State ───────────────────────────────────────── */
 let myName = '', roomId = '';
-let db_sync, db_chat, db_pres_me, db_reactions, db_typing_me, db_typing_room;
+let db_sync, db_chat, db_pres_me, db_reactions;   // Firebase refs
 let isYT = false, ytPlayer = null;
-let chatOnlyMode = false;
+let drawerOpen = false, unread = 0;
+let suppressSync = false;
 let lastPushedUrl = '';
-let ctrlHideTimer, ctrlVisible = true, progDragging = false;
+let ctrlHideTimer;
+let ctrlVisible = true;
+let progDragging = false;
 let knownMsgKeys = new Set();
-let replyingTo = null; // Object for reply feature
-const _heartThrottle = {}; // Защита от спама двойными кликами
+let chatOnlyMode = false;
+let lastPlayTs        = 0;
+let ytSyncTimer       = null; // debounce timer for YT state changes
+let lastLocalActionTs = 0;    // timestamp of last local play/pause/seek — used to guard against stale remote commands
 
-// SYNC STATE
-let lastAppliedSyncTs = 0; 
-let isApplyingRemote = false;
+/* ═══════════════════════════════════════════════════════
+   ENTRY
+═══════════════════════════════════════════════════════ */
+const WORDS_A = ['нежный','тёплый','звёздный','тихий','вечерний','уютный','мягкий','лунный'];
+const WORDS_B = ['котик','закат','вечер','свет','фильм','уют','момент','взгляд'];
 
-/* ── ENTRY ── */
-$('dice-btn').onclick = () => { $('li-room').value = 'room-' + Math.floor(Math.random()*1000); };
-$('enter-btn').onclick = tryEnter;
-['li-name','li-room','li-pass'].forEach(id => $(id).addEventListener('keydown', e => { if(e.key==='Enter') tryEnter(); }));
+$('dice-btn').onclick = () => {
+  const a = WORDS_A[Math.random()*WORDS_A.length|0];
+  const b = WORDS_B[Math.random()*WORDS_B.length|0];
+  $('li-room').value = a + '-' + b;
+};
 
 function tryEnter() {
   const name = $('li-name').value.trim();
   const room = $('li-room').value.trim().toLowerCase().replace(/\s+/g,'-');
-  if (!name || !room || $('li-pass').value !== PASSWORD) { $('lock-err').textContent = 'Ошибка ввода'; return; }
-  
-  myName = name; roomId = room; chatOnlyMode = $('chat-only-cb').checked;
-  $('lock').style.display = 'none'; $('app').classList.add('on');
+  const pass = $('li-pass').value;
+  const err  = $('lock-err');
+
+  if (!name) { err.textContent = 'Введи своё имя'; return; }
+  if (!room) { err.textContent = 'Введи код комнаты'; return; }
+  if (pass !== PASSWORD) {
+    err.textContent = 'Неверный пароль ✕';
+    $('li-pass').value = '';
+    return;
+  }
+  err.textContent = '';
+  myName = name;
+  roomId = room;
+  chatOnlyMode = $('chat-only-cb').checked;
+
+  $('lock').style.display   = 'none';
+  $('app').classList.add('on');
   if (chatOnlyMode) $('app').classList.add('chat-only');
-  
+  $('room-lbl').textContent = roomId;
+  if (!chatOnlyMode) $('user-pill').textContent = myName;
+
   initFirebaseRefs();
-  initChat();
-  initPresence();
-  initKeyboardLogic(); 
-  
   if (!chatOnlyMode) {
     initPlayer();
     initSync();
   }
+  initChat();
+  initPresence();
+  initKeyboard();           // always — iOS keyboard needs this in every mode
+  if (!chatOnlyMode) {
+    initDrawer();
+    initKeyboardShortcuts();
+  }
+
+  // ── iOS audio unlock via AudioContext ──
+  // Must happen inside a user-gesture handler (this button click IS one)
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      const ctx = new AC();
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf; src.connect(ctx.destination); src.start(0);
+      setTimeout(() => ctx.close(), 200);
+    }
+  } catch(e) {}
+
+  // ── iOS video unlock (пункт 6) ──
+  // Attempt muted play/pause while still in user-gesture context.
+  // We try on ALL <video> elements on the page.
+  if (!chatOnlyMode) {
+    document.querySelectorAll('video').forEach(v => {
+      v.muted = true;
+      v.play().then(() => {
+        v.pause();
+        v.currentTime = 0;
+        v.muted = false;
+      }).catch(() => { v.muted = false; });
+    });
+  }
 }
 
+$('enter-btn').onclick = tryEnter;
+['li-name','li-room','li-pass'].forEach(id =>
+  $(id).addEventListener('keydown', e => { if (e.key === 'Enter') tryEnter(); })
+);
+
+// FAQ modal
+const faqModal = $('faq-modal');
+$('faq-btn').onclick = () => { faqModal.style.display = 'flex'; };
+$('faq-close').onclick = () => { faqModal.style.display = 'none'; };
+faqModal.addEventListener('click', e => { if (e.target === faqModal) faqModal.style.display = 'none'; });
+
+/* ─── Firebase refs (room-scoped) ─────────────────── */
+let db_typing_me, db_typing_room;
 function initFirebaseRefs() {
-  const base = 'rooms/' + roomId;
+  const base    = 'rooms/' + roomId;
   const safeKey = myName.replace(/[.#$\/\[\]]/g,'_');
-  db_sync = ref(db, base + '/sync');
-  db_chat = ref(db, base + '/chat');
-  db_pres_me = ref(db, base + '/pres/' + safeKey);
-  db_typing_me = ref(db, base + '/typing/' + safeKey);
-  db_typing_room = ref(db, base + '/typing');
-  db_reactions = ref(db, base + '/reactions'); // Ссылка для лайков
+  db_sync        = ref(db, base + '/sync');
+  db_chat        = ref(db, base + '/chat');
+  db_pres_me     = ref(db, base + '/pres/'   + safeKey);
+  db_typing_me   = ref(db, base + '/typing/' + safeKey);
+  db_typing_room = ref(db, base + '/typing');   // ← FIX: was missing, crashed initChat
+  db_reactions   = ref(db, base + '/reactions');
   onDisconnect(db_typing_me).remove();
   onDisconnect(db_pres_me).remove();
 }
 
-/* ── KEYBOARD FOCUS FIX (MOBILE) ── */
-function initKeyboardLogic() {
-  const ta = $('chat-ta');
-  ta.addEventListener('focus', () => { document.body.classList.add('typing-mode'); setTimeout(() => scrollToBottom(), 100); });
-  ta.addEventListener('blur', () => { setTimeout(() => document.body.classList.remove('typing-mode'), 200); });
-}
-
-/* ── MEDIA ── */
+/* ═══════════════════════════════════════════════════════
+   MEDIA LOADING
+═══════════════════════════════════════════════════════ */
 $('load-btn').onclick = () => loadUrl($('url-inp').value.trim(), true);
+$('url-inp').addEventListener('keydown', e => {
+  if (e.key === 'Enter') loadUrl($('url-inp').value.trim(), true);
+});
+$('url-inp').addEventListener('input', () => {
+  $('clear-btn').style.display = $('url-inp').value ? '' : 'none';
+});
 $('clear-btn').onclick = () => {
   clearVideoLocally();
-  if(!chatOnlyMode) set(db_sync, { url: '', isYT: false, playing: false, time: 0, by: myName, ts: Date.now() });
-};
-$('force-sync-btn').onclick = () => {
-  if (!lastPushedUrl) return;
-  pushSync(); toast('Синхронизирую ⟳');
+  // Broadcast clear to ALL users (including partner)
+  if (!chatOnlyMode) set(db_sync, { url: '', isYT: false, playing: false, time: 0, by: myName, ts: Date.now(), clear: true });
 };
 
+$('force-sync-btn').onclick = () => {
+  if (!lastPushedUrl || chatOnlyMode) { toast('Сначала загрузи видео'); return; }
+  const btn = $('force-sync-btn');
+  btn.classList.add('syncing');
+  setTimeout(() => btn.classList.remove('syncing'), 650);
+  // Push current state as authoritative — no echo suppression (ts far in future bypasses 1s check)
+  const payload = {
+    url: lastPushedUrl, isYT,
+    playing: isPlaying(),
+    time: getCur(),
+    by: myName,
+    ts: Date.now() + 5000   // future ts → partner won't suppress as echo
+  };
+  set(db_sync, payload);
+  toast('Синхронизирую всех к твоему времени ⟳');
+};
+$('vtt-btn').onclick = applyVtt;
+
 function clearVideoLocally() {
-  $('url-inp').value = ''; lastPushedUrl = '';
-  $('clear-btn').style.display = 'none';
-  const v = $('vid'); v.pause(); v.removeAttribute('src'); v.load(); v.style.display='none';
-  if(ytPlayer) { try{ytPlayer.destroy()}catch(e){} ytPlayer=null; }
-  $('yt-wrap').classList.remove('on'); $('ph').style.display = 'flex';
+  $('url-inp').value = '';
+  lastPushedUrl = '';
+  const cb = $('clear-btn');
+  if (cb) cb.style.display = 'none';
+  const v = $('vid');
+  v.pause(); v.removeAttribute('src'); v.load();
+  v.style.display = 'none';
+  destroyYT();
+  $('yt-wrap').classList.remove('on');
+  $('yt-wrap').style.display = '';
+  $('ph').style.display = '';
 }
 
 function loadUrl(url, broadcast) {
   if (!url) return;
   lastPushedUrl = url;
-  $('clear-btn').style.display = 'block';
-  
-  const ytId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([A-Za-z0-9_-]{11})/);
-  if (ytId) loadYT(ytId[1]); else loadMP4(url);
-  
-  if (broadcast) {
-    const payload = { url, isYT: !!ytId, playing: false, time: 0, by: myName, ts: Date.now() };
-    set(db_sync, payload);
+  const ytId = getYtId(url);
+  if (ytId) loadYT(ytId);
+  else      loadMP4(url);
+  if (broadcast) pushSync();
+  // Show clear button
+  const cb = $('clear-btn');
+  if (cb) cb.style.display = '';
+}
+
+function getYtId(url) {
+  const m = url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/
+  );
+  return m ? m[1] : null;
+}
+
+function setYTMode(yt) {
+  const overlay = $('ctrl-overlay');
+  const centre  = $('centre-btn');
+  const shield  = $('yt-shield');
+  if (yt) {
+    // Пункт 5: YouTube — скрываем все кастомные слои, пользователь взаимодействует
+    // напрямую с нативным плеером YouTube (controls: 1)
+    if (centre)  centre.style.display  = 'none';
+    if (shield)  shield.style.display  = 'none';
+    overlay.style.display = 'none';
+    overlay.dataset.ytMode = '1';
+  } else {
+    // MP4 — показываем кастомный плеер с зонами перемотки
+    if (centre)  centre.style.display  = '';
+    if (shield)  shield.style.display  = '';
+    overlay.style.display = '';
+    overlay.dataset.ytMode = '';
   }
 }
 
 function loadMP4(src) {
-  isYT = false; $('yt-wrap').classList.remove('on'); $('ph').style.display = 'none';
-  const v = $('vid'); v.src = src; v.style.display = 'block'; v.load();
+  destroyYT();
+  const v = $('vid');
+  v.preload = 'metadata';
+  v.src = src;
+  v.style.display = 'block';
+  $('yt-wrap').classList.remove('on');
+  $('ph').style.display = 'none';
+  isYT = false;
+  setYTMode(false);
+  v.load();
+  applyVtt();
+  const cb = $('clear-btn');
+  if (cb) cb.style.display = '';   // show ✕ button
+  toast('Загружаю видео…');
 }
 
 function loadYT(id) {
-  isYT = true; $('vid').style.display = 'none'; $('ph').style.display = 'none'; $('yt-wrap').classList.add('on');
+  $('vid').style.display = 'none';
+  $('vid').src = '';
+  destroyYT();
+  $('yt-wrap').classList.add('on');
+  $('ph').style.display = 'none';
+  isYT = true;
+  setYTMode(true);
+  const cb = $('clear-btn');
+  if (cb) cb.style.display = '';   // show ✕ button
+  // Load YT API if needed
   if (window.YT && window.YT.Player) { buildYT(id); return; }
   window.__ytCb = () => buildYT(id);
-  if (!document.querySelector('script[src*="youtube"]')) {
-    const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s);
+  if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
   }
 }
-window.onYouTubeIframeAPIReady = () => { if(window.__ytCb){window.__ytCb(); window.__ytCb=null;} };
+
+window.onYouTubeIframeAPIReady = () => {
+  if (window.__ytCb) { window.__ytCb(); window.__ytCb = null; }
+};
 
 function buildYT(id) {
-  $('yt-inner').innerHTML = '<div id="yt-player"></div>';
+  $('yt-inner').innerHTML = '';
+  const div = document.createElement('div');
+  div.id = 'yt-player';
+  $('yt-inner').appendChild(div);
+
   ytPlayer = new YT.Player('yt-player', {
-    videoId: id, width: '100%', height: '100%',
-    playerVars: { playsinline: 1, rel: 0, controls: 1 },
+    videoId: id,
+    width: '100%', height: '100%',
+    playerVars: {
+      playsinline: 1, rel: 0,
+      modestbranding: 1,
+      // Пункт 5: для YouTube используем нативные контролы — особенно важно на iOS
+      controls: 1, fs: 1,
+      iv_load_policy: 3
+    },
     events: {
-      onReady: () => toast('YouTube готов ✓'),
-      onStateChange: (e) => {
-        if(isApplyingRemote) return; 
-        if(e.data === YT.PlayerState.PLAYING) pushSync();
-        if(e.data === YT.PlayerState.PAUSED) pushSync();
+      onReady() {
+        const iframe = $('yt-inner').querySelector('iframe');
+        if (iframe) Object.assign(iframe.style, {
+          width:'100%', height:'100%', border:'0', display:'block', position:'absolute', top:'0', left:'0'
+        });
+        toast('YouTube готов ✓');
+      },
+      onStateChange(e) {
+        const s = e.data;
+        // Ignore BUFFERING (3) and UNSTARTED (-1) — these cause false pauses on partner's device
+        if (s === YT.PlayerState.BUFFERING || s === YT.PlayerState.UNSTARTED) return;
+        syncPlayIcon(s === YT.PlayerState.PLAYING);
+        // Debounce: don't push during rapid state changes (e.g. while seeking)
+        clearTimeout(ytSyncTimer);
+        ytSyncTimer = setTimeout(() => {
+          if (!suppressSync && !chatOnlyMode) pushSync();
+        }, 600);
       }
     }
   });
 }
 
-/* ── SYNC (STABLE) ── */
-function isPlaying() { return isYT ? (ytPlayer && ytPlayer.getPlayerState()===1) : (!$('vid').paused && !$('vid').ended); }
-function getCur() { return isYT ? (ytPlayer ? ytPlayer.getCurrentTime():0) : ($('vid').currentTime||0); }
-function togglePlay() {
-  if (isYT) { if(ytPlayer) ytPlayer.getPlayerState()===1 ? ytPlayer.pauseVideo() : ytPlayer.playVideo(); }
-  else { const v = $('vid'); v.paused ? v.play() : v.pause(); }
+function destroyYT() {
+  if (ytPlayer) { try { ytPlayer.destroy(); } catch(_){} ytPlayer = null; }
+  $('yt-inner').innerHTML = '';
+  isYT = false;
 }
 
-function pushSync() {
-  if (chatOnlyMode) return;
-  const payload = {
-    url: lastPushedUrl || $('url-inp').value,
-    isYT, playing: isPlaying(), time: getCur(),
-    by: myName, ts: Date.now()
+function applyVtt() {
+  const url = $('vtt-inp').value.trim();
+  if (!url || isYT) return;
+  const v = $('vid');
+  Array.from(v.querySelectorAll('track')).forEach(t => t.remove());
+  const tr = document.createElement('track');
+  Object.assign(tr, { kind:'subtitles', label:'Субтитры', srclang:'ru', src:url, default:true });
+  v.appendChild(tr);
+  if (v.textTracks[0]) v.textTracks[0].mode = 'showing';
+  toast('Субтитры загружены');
+}
+
+/* ═══════════════════════════════════════════════════════
+   PLAYER CONTROLS
+═══════════════════════════════════════════════════════ */
+function initPlayer() {
+  const v   = $('vid');
+  const pw  = $('prog-wrap');
+  const vol = $('vol-range');
+
+  /* Play / Pause button (bottom bar) */
+  $('play-btn').onclick = e => { e.stopPropagation(); togglePlay(); pushSync(); };
+
+  /* Centre play/pause button */
+  $('centre-btn').onclick = e => { e.stopPropagation(); togglePlay(); pushSync(); showCtrl(); };
+
+  /* YT tap shield — desktop: click toggles play; mobile: pass through to YT */
+  $('yt-shield').onclick = e => {
+    e.stopPropagation();
+    if (!isTouchDevice()) {
+      // Desktop: our click handler controls play/pause
+      togglePlay(); pushSync(); showCtrl();
+    } else {
+      // Mobile: just show controls, let YT iframe handle actual play via its own touch
+      showCtrl();
+    }
   };
-  set(db_sync, payload);
+
+  /* Skip */
+  $('back-btn').onclick = e => { e.stopPropagation(); seekRel(-10); };
+  $('fwd-btn').onclick  = e => { e.stopPropagation(); seekRel(+10); };
+
+  /* ── Progress drag ── */
+  function seekFromX(clientX) {
+    const r = pw.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    const dur = getDur();
+    if (!dur) return;
+    seekAbs(pct * dur, false);
+  }
+  pw.addEventListener('mousedown', e => {
+    progDragging = true; pw.classList.add('drag');
+    seekFromX(e.clientX); e.preventDefault(); e.stopPropagation();
+  });
+  pw.addEventListener('touchstart', e => {
+    progDragging = true; pw.classList.add('drag');
+    seekFromX(e.touches[0].clientX); showCtrl(); e.stopPropagation();
+  }, { passive: true });
+  document.addEventListener('mousemove', e => {
+    if (progDragging) seekFromX(e.clientX);
+  });
+  document.addEventListener('touchmove', e => {
+    if (progDragging) seekFromX(e.touches[0].clientX);
+  }, { passive: true });
+  function endDrag() {
+    if (!progDragging) return;
+    progDragging = false;
+    $('prog-wrap').classList.remove('drag');
+    pushSync();
+  }
+  document.addEventListener('mouseup',   endDrag);
+  document.addEventListener('touchend',  endDrag);
+
+  /* Volume */
+  vol.oninput = e => {
+    v.volume = +e.target.value;
+    $('mute-btn').textContent = +e.target.value > 0 ? '🔊' : '🔇';
+  };
+  $('mute-btn').onclick = e => {
+    e.stopPropagation();
+    v.muted = !v.muted;
+    $('mute-btn').textContent = v.muted ? '🔇' : '🔊';
+  };
+  $('vol-range').onclick = e => e.stopPropagation();
+
+  /* Fullscreen */
+  $('fs-btn').onclick = e => { e.stopPropagation(); toggleFS(); };
+
+  /* Tap-to-play overlay (iOS autoplay blocked) */
+  const ttp = $('tap-to-play');
+  if (ttp) {
+    ttp.addEventListener('click', () => {
+      const v = $('vid');
+      v.play().then(() => { ttp.style.display = 'none'; }).catch(() => {});
+    });
+    ttp.addEventListener('touchend', e => {
+      e.preventDefault();
+      const v = $('vid');
+      v.play().then(() => { ttp.style.display = 'none'; }).catch(() => {});
+    });
+  }
+
+  /* iOS: скрываем tap-to-play при успешном старте */
+  v.addEventListener('play', () => {
+    if (ttp) ttp.style.display = 'none';
+  });
+
+  /* ── Desktop: click anywhere on video = play/pause ──
+     On touch devices 'click' fires after touchend — we must ignore it
+     there to prevent ghost pauses. Only real mouse clicks count.
+  ── */
+  $('player-wrap').addEventListener('click', e => {
+    if (isTouchDevice()) return;            // mobile: never pause via click
+    if (e.target.closest('#ctrl-bar'))   return;
+    if (e.target.closest('#centre-btn')) return;
+    if (e.target.closest('#sync-pill'))  return;
+    if (e.target.closest('#user-pill'))  return;
+    if (e.target.closest('#yt-shield'))  return;
+    togglePlay(); pushSync(); showCtrl();
+  });
+
+  /* ── Mobile tap handling ─────────────────────────────────────────
+     PRINCIPLE: "First touch shows UI only — never triggers actions"
+     
+     touchstart → immediately show controls (finger-down = instant UI)
+     touchend   → count taps for double-tap detection
+     
+     Single tap (after 280ms debounce):
+       → If panel was hidden: already shown by touchstart, reset timer
+       → If panel was visible: reset the 2.5s hide timer (keep visible)
+       → NEVER pauses video on mobile
+     
+     Double tap:
+       Left 40%   → seek −10s
+       Right 40%  → seek +10s
+       Centre 20% → ignored (safe zone)
+  ────────────────────────────────────────────────────────────────── */
+  let tapTimer = null, tapCount = 0, tapX = 0;
+
+  // touchstart: show controls immediately on any finger-down
+  // This is the "first touch shows UI" mechanism — the panel appears
+  // the instant the finger touches the screen, not on release.
+  $('player-wrap').addEventListener('touchstart', e => {
+    // Don't interfere with ctrl-bar or centre-btn interactions
+    if (e.target.closest('#ctrl-bar')) return;
+    if (e.target.closest('#centre-btn')) return;
+    // Show controls immediately, reset auto-hide timer
+    showCtrl();
+  }, { passive: true });
+
+  $('player-wrap').addEventListener('touchend', e => {
+    // ctrl-bar and centre-btn have their own handlers (and are blocked by
+    // CSS pointer-events:none when panel is hidden — so this is safe)
+    if (e.target.closest('#ctrl-bar')) return;
+    if (e.target.closest('#centre-btn')) return;
+
+    tapCount++;
+    tapX = e.changedTouches[0].clientX;
+
+    if (tapCount === 1) {
+      tapTimer = setTimeout(() => {
+        tapCount = 0;
+        // Single tap resolved: panel is already visible (shown on touchstart).
+        // Just reset the timer — showCtrl() does exactly that.
+        showCtrl();
+      }, 280);
+    } else if (tapCount >= 2) {
+      clearTimeout(tapTimer);
+      tapCount = 0;
+      const rect = $('player-wrap').getBoundingClientRect();
+      const relX = tapX - rect.left;
+      const w    = rect.width;
+      // Double-tap seek: ONLY for MP4, not YouTube
+      // YouTube has its own seek and our overlay would conflict
+      if (!isYT) {
+        if (relX < w * 0.40) {
+          seekRel(-10); showCtrl(); showSeekFeedback(-10);
+        } else if (relX > w * 0.60) {
+          seekRel(+10); showCtrl(); showSeekFeedback(+10);
+        }
+        // Centre 20% → intentionally no action
+      }
+    }
+  }, { passive: true });
+
+  $('player-wrap').addEventListener('mousemove', showCtrl);
+
+  /* ── Video element events ── */
+  function syncPlayIcon(playing) {
+    $('play-btn').textContent = playing ? '⏸' : '▶';
+    const svg = $('centre-icon');
+    if (svg) {
+      svg.innerHTML = playing
+        ? '<rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/>'
+        : '<polygon points="5,3 19,12 5,21"/>';
+    }
+  }
+  v.addEventListener('play',  () => { syncPlayIcon(true);  lastPlayTs = Date.now(); });
+  v.addEventListener('pause', () => {
+    syncPlayIcon(false);
+    // Пункт 7: анти-петля — если видео запущено менее 3с назад, не шлём pause в Firebase
+    // Это защита от ситуации, когда буфер ещё не загружен и Safari ставит паузу сам
+    if (Date.now() - lastPlayTs < 3000) return;
+    if (!suppressSync && !chatOnlyMode) pushSync();
+  });
+  v.addEventListener('timeupdate',     updateProg);
+  v.addEventListener('durationchange', updateProg);
+  v.addEventListener('waiting',        () => setSS('warn','Буферизация…'));
+  v.addEventListener('canplay',        () => setSS('ok','Синхронизировано'));
+
+  /* ── YT progress ticker ── */
+  setInterval(() => {
+    if (isYT && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+      updateProgValues(ytPlayer.getCurrentTime(), ytPlayer.getDuration());
+    }
+  }, 500);
+
+  /* ── Fullscreen change ── */
+  const FS_ICON_ENTER = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+  const FS_ICON_EXIT  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>`;
+  $('fs-btn').innerHTML = FS_ICON_ENTER;
+
+  ['fullscreenchange','webkitfullscreenchange'].forEach(ev =>
+    document.addEventListener(ev, () => {
+      const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      $('fs-btn').innerHTML = isFS ? FS_ICON_EXIT : FS_ICON_ENTER;
+      showCtrl();
+    })
+  );
+}
+
+/* Player helpers */
+function isPlaying() {
+  if (isYT) return ytPlayer ? ytPlayer.getPlayerState() === 1 : false;
+  const v = $('vid'); return !v.paused && !v.ended;
+}
+function getCur() {
+  if (isYT) return ytPlayer ? ytPlayer.getCurrentTime() : 0;
+  return $('vid').currentTime || 0;
+}
+function getDur() {
+  if (isYT) return ytPlayer ? ytPlayer.getDuration() : 0;
+  const d = $('vid').duration; return isFinite(d) ? d : 0;
+}
+function seekAbs(t, broadcast) {
+  t = Math.max(0, t);
+  if (isYT) { if (ytPlayer) ytPlayer.seekTo(t, true); }
+  else $('vid').currentTime = t;
+  if (broadcast) pushSync();
+}
+function seekRel(d) { seekAbs(getCur() + d, true); }
+
+function togglePlay() {
+  if (isYT) {
+    if (!ytPlayer) return;
+    if (ytPlayer.getPlayerState() === 1) ytPlayer.pauseVideo();
+    else ytPlayer.playVideo();
+  } else {
+    const v = $('vid');
+    if (v.paused) v.play().catch(() => {});
+    else v.pause();
+  }
+}
+
+function updateProg() {
+  updateProgValues($('vid').currentTime, $('vid').duration);
+}
+function updateProgValues(cur, dur) {
+  if (!dur || !isFinite(dur)) return;
+  const pct = Math.min(100, (cur / dur) * 100);
+  $('prog-fill').style.width  = pct + '%';
+  $('prog-thumb').style.left  = pct + '%';
+  $('time-lbl').textContent   = fmt(cur) + ' / ' + fmt(dur);
+}
+function fmt(s) {
+  if (!isFinite(s)||isNaN(s)) return '0:00';
+  const m = Math.floor(s/60)|0, ss = Math.floor(s%60)|0;
+  return m + ':' + String(ss).padStart(2,'0');
+}
+
+/* ── Controls visibility ─────────────────────────────────────────────
+   Desktop (no touch): controls always visible, auto-hide only in FS.
+   Touch device (mobile/tablet): always auto-hide after CTRL_TIMEOUT.
+   showCtrl() is safe to call repeatedly — it always restarts the timer.
+────────────────────────────────────────────────────────────────────── */
+const isTouchDevice = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+function showCtrl() {
+  ctrlVisible = true;
+  $('ctrl-overlay').classList.remove('hidden');
+  clearTimeout(ctrlHideTimer);
+  const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  // Auto-hide on: any fullscreen mode, OR any touch device
+  if (isFS || isTouchDevice()) {
+    ctrlHideTimer = setTimeout(hideCtrl, CTRL_TIMEOUT);
+  }
+}
+function hideCtrl() {
+  const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  // Keep visible on desktop outside fullscreen
+  if (!isFS && !isTouchDevice()) return;
+  ctrlVisible = false;
+  $('ctrl-overlay').classList.add('hidden');
+}
+
+/* Seek feedback flash for mobile double-tap */
+function showSeekFeedback(seconds) {
+  const id = 'sf_' + (seconds < 0 ? 'l' : 'r');
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = id;
+    Object.assign(el.style, {
+      position:'absolute', top:'50%', transform:'translateY(-50%)',
+      [seconds < 0 ? 'left' : 'right']: '10%',
+      background:'rgba(0,0,0,.5)', borderRadius:'50%',
+      width:'70px', height:'70px',
+      display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center',
+      pointerEvents:'none', zIndex:'25',
+      fontSize:'20px', color:'#fff',
+      fontFamily:'DM Mono,monospace',
+      transition:'opacity .35s',
+    });
+    $('player-wrap').appendChild(el);
+  }
+  el.innerHTML = (seconds < 0 ? '⏪' : '⏩') +
+    '<br><span style="font-size:10px">' + Math.abs(seconds) + 'с</span>';
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; }, 800);
+}
+
+/* Fullscreen — with iPhone fallback (webkitEnterFullscreen on <video>) */
+function toggleFS() {
+  const wrap = $('player-wrap');
+  const v    = $('vid');
+  const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+
+  if (!isFS) {
+    if (wrap.requestFullscreen) {
+      wrap.requestFullscreen().catch(() => {});
+    } else if (wrap.webkitRequestFullscreen) {
+      wrap.webkitRequestFullscreen();
+    } else if (!isYT && v.webkitEnterFullscreen) {
+      // iPhone Safari: only the <video> element itself can go fullscreen
+      v.webkitEnterFullscreen();
+    }
+  } else {
+    if (document.exitFullscreen)        document.exitFullscreen().catch(() => {});
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    else if (!isYT && v.webkitExitFullscreen) v.webkitExitFullscreen();
+  }
+}
+
+/* ── Keyboard shortcuts (desktop) ── */
+function initKeyboardShortcuts() {
+  document.addEventListener('keydown', e => {
+    // Don't trigger when typing in input/textarea
+    if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+    switch (e.code) {
+      case 'Space':
+        e.preventDefault(); togglePlay(); pushSync(); showCtrl(); break;
+      case 'ArrowLeft':
+        e.preventDefault(); seekRel(-10); showCtrl(); break;
+      case 'ArrowRight':
+        e.preventDefault(); seekRel(+10); showCtrl(); break;
+      case 'ArrowUp':
+        e.preventDefault(); {
+          const v = $('vid'); const vr = $('vol-range');
+          if (!isYT) { v.volume = Math.min(1, v.volume + 0.1); vr.value = v.volume; }
+          showCtrl();
+        } break;
+      case 'ArrowDown':
+        e.preventDefault(); {
+          const v = $('vid'); const vr = $('vol-range');
+          if (!isYT) { v.volume = Math.max(0, v.volume - 0.1); vr.value = v.volume; }
+          showCtrl();
+        } break;
+      case 'KeyF':
+        e.preventDefault(); toggleFS(); break;
+      case 'KeyM':
+        e.preventDefault(); {
+          const v = $('vid'); v.muted = !v.muted;
+          $('mute-btn').textContent = v.muted ? '🔇' : '🔊';
+        } break;
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════
+   SYNC (Firebase Realtime Database)
+═══════════════════════════════════════════════════════ */
+let lastPushTs = 0;
+
+function pushSync(isHeartbeat = false) {
+  // Пункт 1: в режиме «только чат» не отправляем команды управления
+  if (chatOnlyMode) return;
+  const now = Date.now();
+  lastPushTs = now;
+  if (!isHeartbeat) lastLocalActionTs = now;  // record explicit user action
+  const payload = {
+    url:         lastPushedUrl || $('url-inp').value.trim(),
+    isYT,
+    playing:     isPlaying(),
+    time:        getCur(),
+    by:          myName,
+    ts:          now,
+    isHeartbeat: isHeartbeat   // flag: heartbeat vs explicit user action
+  };
+  set(db_sync, payload).catch(e => console.error('pushSync error:', e));
 }
 
 function initSync() {
+  setSS('warn', 'Подключение…');
+
   onValue(db_sync, snap => {
     const d = snap.val();
-    if (!d || chatOnlyMode) return;
-    if (d.by === myName) return;
-    if (d.ts <= lastAppliedSyncTs) return;
-    lastAppliedSyncTs = d.ts;
+    if (!d) { setSS('ok', 'Готово'); return; }
+    if (chatOnlyMode) return;
 
-    if (d.url && d.url !== lastPushedUrl) {
-      $('url-inp').value = d.url;
-      loadUrl(d.url, false);
-      setTimeout(() => applyRemoteState(d), 1500);
+    const age = Date.now() - (d.ts || 0);
+
+    // Echo suppression: ignore our own pushes within 2s
+    if (d.by === myName && age < 2000) return;
+
+    // ── Clear signal: partner pressed ✕ ──
+    if (d.clear && (!d.url || d.url === '')) {
+      clearVideoLocally();
       return;
     }
-    applyRemoteState(d);
+
+    suppressSync = true;
+
+    // ── Load new URL if it changed ──
+    const incomingUrl = d.url || '';
+    if (incomingUrl && incomingUrl !== lastPushedUrl) {
+      lastPushedUrl = incomingUrl;
+      $('url-inp').value = incomingUrl;
+      const ytId = getYtId(incomingUrl);
+      if (ytId) loadYT(ytId);
+      else if (incomingUrl) loadMP4(incomingUrl);
+      // Give player a moment to init, then apply state
+      setTimeout(() => applyRemote(d), 1800);
+    } else {
+      applyRemote(d);
+    }
+
+    // Extended timeout: must outlast YT onStateChange debounce (600ms) + buffer
+    setTimeout(() => { suppressSync = false; }, 1500);
+  }, err => {
+    setSS('err', 'Ошибка подключения');
+    console.error('sync listener error:', err);
   });
+
+  // Heartbeat: only for late-joiners (time sync).
+  setInterval(() => {
+    if (lastPushedUrl && !suppressSync && isPlaying()) pushSync(true);
+  }, HB_INTERVAL);
 }
 
-function applyRemoteState(d) {
-  isApplyingRemote = true; 
-  const drift = Math.abs(getCur() - d.time);
-  
-  if (d.playing !== isPlaying()) {
-    if (d.playing) {
-      if (isYT) { ytPlayer && ytPlayer.playVideo(); } else { $('vid').play().catch(()=>{}); }
+function applyRemote(d) {
+  const ageSec     = (Date.now() - (d.ts || 0)) / 1000;
+  const targetTime = d.playing
+    ? (d.time || 0) + ageSec   // compensate network latency
+    : (d.time || 0);
+
+  const drift = getCur() - targetTime; // positive = we're ahead
+
+  if (d.isHeartbeat) {
+    // Heartbeat: only seek if we're playing AND drift is large.
+    // NEVER seek a paused device from a heartbeat (would shift frame unexpectedly).
+    if (isPlaying() && Math.abs(drift) > 15) {
+      seekAbs(targetTime, false);
+      setSS('warn', 'Синхронизация…');
+      setTimeout(() => setSS('ok', 'Синхронизировано'), 1500);
     } else {
-      if (isYT) { ytPlayer && ytPlayer.pauseVideo(); } else { $('vid').pause(); }
+      setSS('ok', 'Синхронизировано');
+    }
+    return; // ← heartbeats never change play/pause state
+  }
+
+  // ── Explicit user action ──
+
+  // Apply seek only if remote action is newer than last local action (or drift is huge)
+  const remoteTs   = d.ts || 0;
+  const seekAllowed = remoteTs > lastLocalActionTs || Math.abs(drift) > 30;
+  if (seekAllowed) {
+    if (Math.abs(drift) > 2) {
+      seekAbs(targetTime, false);
+      if (Math.abs(drift) > SYNC_DRIFT) {
+        setSS('warn', 'Синхронизация…');
+        setTimeout(() => setSS('ok', 'Синхронизировано'), 1500);
+        return;
+      }
     }
   }
 
-  if (drift > 1.5) {
-    if (isYT) { ytPlayer && ytPlayer.seekTo(d.time, true); }
-    else { $('vid').currentTime = d.time; }
+  // ── Play/Pause: ALWAYS apply remote state, never silently drop it ──
+  if (d.playing && !isPlaying()) {
+    if (isYT) { if (ytPlayer) ytPlayer.playVideo(); }
+    else {
+      $('vid').play().catch(() => {
+        const ttp = $('tap-to-play');
+        if (ttp) ttp.style.display = 'flex';
+      });
+    }
+  } else if (!d.playing && isPlaying()) {
+    if (isYT) { if (ytPlayer) ytPlayer.pauseVideo(); }
+    else $('vid').pause();
   }
-  setTimeout(() => { isApplyingRemote = false; }, 1000);
+
+  setSS('ok', 'Синхронизировано');
 }
 
-function initPlayer() {
-  const v = $('vid');
-  v.addEventListener('play', () => { if(!isApplyingRemote) pushSync(); $('play-btn').textContent = '⏸'; });
-  v.addEventListener('pause', () => { if(!isApplyingRemote) pushSync(); $('play-btn').textContent = '▶'; });
-  v.addEventListener('seeked', () => { if(!isApplyingRemote) pushSync(); });
-  v.addEventListener('timeupdate', () => {
-    const pct = (v.currentTime / v.duration) * 100 || 0;
-    $('prog-fill').style.width = pct+'%'; $('prog-thumb').style.left = pct+'%';
+function setSS(state, text) {
+  $('slbl').textContent = text;
+  const cls = state === 'warn' ? ' warn' : state === 'err' ? ' err' : '';
+  $('sdot').className = 'sdot' + cls;
+}
+
+/* ═══════════════════════════════════════════════════════
+   PRESENCE
+═══════════════════════════════════════════════════════ */
+function initPresence() {
+  // Обновляем своё присутствие + текущий таймкод
+  function pushPresence() {
+    const payload = { name: myName, online: true };
+    if (!chatOnlyMode) payload.time = getCur();
+    set(db_pres_me, payload);
+  }
+  pushPresence();
+  onDisconnect(db_pres_me).remove();
+
+  // Обновляем своё присутствие регулярно (и в обычном режиме, и в chat-only)
+  // В chat-only — раз в 5с, в обычном — раз в секунду (для таймкода)
+  setInterval(pushPresence, chatOnlyMode ? 5000 : 1000);
+
+  // При переподключении Firebase (например, после фона) — сразу заново пушим присутствие
+  const connRef = ref(db, '.info/connected');
+  onValue(connRef, snap => {
+    if (snap.val() === true) {
+      onDisconnect(db_pres_me).remove();
+      pushPresence();
+    }
   });
-  
-  $('play-btn').onclick = () => togglePlay();
-  $('centre-btn').onclick = () => togglePlay();
-  $('yt-shield').onclick = () => { if(window.innerWidth > 768) togglePlay(); };
+
+  const presRoomRef = ref(db, 'rooms/' + roomId + '/pres');
+  onValue(presRoomRef, snap => {
+    const data  = snap.val() || {};
+    const users = Object.values(data).filter(u => u && u.name && u.online);
+
+    // Партнёр-лейбл
+    const others = users.filter(u => u.name !== myName);
+    $('partner-lbl').textContent = others.length
+      ? others.map(u => u.name).join(', ') + ' здесь ❤'
+      : 'Ожидание партнёра…';
+
+    // Пункт 3: статус-бар с таймкодами
+    const bar = $('status-bar');
+    if (bar) {
+      bar.innerHTML = users.map(u => {
+        const tc = (typeof u.time === 'number' && u.time >= 0) ? fmt(u.time) : '—';
+        const isMe = u.name === myName;
+        return `<span class="sb-item">${isMe ? '👤' : '👁'} <b>${esc(u.name)}</b>: ${tc}</span>`;
+      }).join('');
+    }
+  });
 }
 
-/* ── CHAT, REPLIES, & REACTIONS ── */
-window.cancelReply = function() { replyingTo = null; $('reply-preview').classList.remove('active'); }
+/* ═══════════════════════════════════════════════════════
+   CHAT
+═══════════════════════════════════════════════════════ */
+let typingTimer = null;
 
-function setReply(key, name, text) {
-  replyingTo = { key, name, text };
-  $('reply-preview-text').innerHTML = `<b>${esc(name)}</b>: ${esc(text)}`;
-  $('reply-preview').classList.add('active');
-  $('chat-ta').focus();
-}
-
-window.scrollToMsg = function(key) {
-  const msg = document.querySelector(`.msg[data-msg-key="${key}"]`);
-  if (msg) {
-    msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    const bbl = msg.querySelector('.msg-bbl');
-    if(bbl) { bbl.classList.remove('tap-flash'); void bbl.offsetWidth; bbl.classList.add('tap-flash'); }
-  }
+function setTyping(active) {
+  if (!db_typing_me) return;
+  set(db_typing_me, active ? { name: myName, ts: Date.now() } : null)
+    .catch(() => {});
 }
 
 function initChat() {
   const ta = $('chat-ta');
+
+  // Send on button click
   $('send-btn').onclick = sendMsg;
-  ta.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } });
-  
-  onValue(db_chat, snap => {
-    const data = snap.val() || {};
-    $('msgs').innerHTML = '';
-    Object.entries(data).forEach(([k, m]) => {
-      const node = buildMsg(m, k);
-      if (node) $('msgs').appendChild(node);
-    });
-    scrollToBottom();
+
+  // Send on Enter (Shift+Enter = newline)
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
   });
 
-  // Панель реакций
+  // Auto-resize textarea
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 90) + 'px';
+  });
+
+  // ── Typing indicator ──
+  ta.addEventListener('focus', () => {
+    setTyping(true);
+    clearTimeout(typingTimer);
+  });
+  ta.addEventListener('input', () => {
+    setTyping(true);
+    clearTimeout(typingTimer);
+    // Auto-clear if idle for 3s
+    typingTimer = setTimeout(() => setTyping(false), 3000);
+  });
+  ta.addEventListener('blur', () => {
+    clearTimeout(typingTimer);
+    setTyping(false);
+  });
+
+  // ── Listen to typing status ──
+  onValue(db_typing_room, snap => {
+    const data = snap.val() || {};
+    const safeMyKey = myName.replace(/[.#$\/\[\]]/g,'_');
+    const others = Object.entries(data)
+      .filter(([k, v]) => k !== safeMyKey && v && v.name)
+      .map(([, v]) => v.name);
+    const el = $('typing-indicator');
+    if (el) {
+      if (others.length > 0) {
+        el.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span> ${esc(others[0])} печатает…`;
+      } else {
+        el.innerHTML = '';
+      }
+    }
+  }, () => {});
+
+  // Reaction buttons
   document.querySelectorAll('.rb').forEach(btn => {
     btn.onclick = () => {
       const emoji = btn.dataset.e;
-      push(db_chat, { type: 'reaction', emoji, name: myName, ts: serverTimestamp() }).catch(e => console.error(e));
+      push(db_chat, { type:'reaction', emoji, name:myName, ts: serverTimestamp() })
+        .catch(e => console.error('reaction push:', e));
       spawnFloat(emoji, btn);
     };
   });
 
-  // Быстрые фразы
-  document.querySelectorAll('.qp-btn').forEach(b => b.onclick = () => {
-    push(db_chat, { type:'msg', text: b.dataset.phrase, name: myName, ts: serverTimestamp() });
+  // Пункт 4: быстрые фразы
+  document.querySelectorAll('.qp-btn').forEach(btn => {
+    btn.onclick = () => {
+      const text = btn.dataset.phrase;
+      if (!text) return;
+      push(db_chat, { type:'msg', text, name:myName, ts: serverTimestamp() })
+        .catch(e => console.error('quick phrase push:', e));
+    };
   });
 
-  // Слушатель Firebase для лайков на сообщениях
+  // ── Listen to chat messages ──
+  onValue(db_chat, snap => {
+    const data = snap.val();
+    const msgs = $('msgs');
+
+    if (!data) { msgs.innerHTML = ''; return; }
+
+    const entries = Object.entries(data);
+    const newEntries = entries.filter(([k]) => !knownMsgKeys.has(k));
+
+    // First load: full render without animation
+    if (knownMsgKeys.size === 0) {
+      msgs.innerHTML = '';
+      entries.forEach(([k, m]) => {
+        const node = buildMsg(m, k);
+        if (node) msgs.appendChild(node);
+      });
+      msgs.scrollTop = msgs.scrollHeight;
+    } else {
+      // Incremental: only append new messages, preserve scroll position
+      const atBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 60;
+
+      newEntries.forEach(([k, m]) => {
+        const node = buildMsg(m, k);
+        if (node) msgs.appendChild(node);
+      });
+
+      if (atBottom && newEntries.length > 0) {
+        requestAnimationFrame(() => {
+          msgs.scrollTop = msgs.scrollHeight;
+        });
+      }
+
+      // Unread badge (mobile only)
+      if (!drawerOpen && window.innerWidth < 768 && newEntries.length > 0) {
+        unread += newEntries.length;
+        const badge = $('unread-badge');
+        badge.textContent = unread;
+        badge.classList.add('on');
+      }
+    }
+
+    knownMsgKeys = new Set(entries.map(([k]) => k));
+  }, err => console.error('chat listener error:', err));
+
   initReactions();
 }
 
-function scrollToBottom() { const m = $('msgs'); m.scrollTop = m.scrollHeight; }
-
 function sendMsg() {
-  const text = $('chat-ta').value.trim();
+  const ta   = $('chat-ta');
+  const text = ta.value.trim();
   if (!text) return;
-  const payload = { type:'msg', text, name: myName, ts: serverTimestamp() };
-  if (replyingTo) { payload.replyTo = replyingTo; }
-  
-  push(db_chat, payload);
-  $('chat-ta').value = ''; cancelReply();
+
+  // Clear typing status immediately on send
+  clearTimeout(typingTimer);
+  setTyping(false);
+
+  push(db_chat, { type:'msg', text, name:myName, ts: serverTimestamp() })
+    .catch(e => { toast('Ошибка отправки ✕'); console.error('send error:', e); });
+
+  ta.value = '';
+  ta.style.height = 'auto';
 }
 
 function buildMsg(m, key) {
@@ -695,49 +2045,43 @@ function buildMsg(m, key) {
 
   if (m.type === 'reaction') {
     div.className = 'msg sys';
-    div.innerHTML = `<div class="msg-bbl"><b>${esc(m.name)}</b> отправил(а) ${m.emoji}</div>`;
+    div.innerHTML = `<div class="msg-bbl">${esc(m.name)} отправил(а) ${m.emoji}</div>`;
     return div;
   }
 
-  const isMe = m.name === myName;
-  div.className = 'msg ' + (isMe ? 'me' : 'them');
-  div.dataset.msgKey = key;
-  
-  let replyHtml = '';
-  if (m.replyTo) {
-    replyHtml = `<div class="msg-reply-block" onclick="scrollToMsg('${m.replyTo.key}')">
-                   <div class="msg-reply-name">${esc(m.replyTo.name)}</div>
-                   <div class="msg-reply-text">${esc(m.replyTo.text)}</div>
-                 </div>`;
+  if (m.type === 'msg') {
+    const isMe = (m.name === myName);
+    div.className = 'msg ' + (isMe ? 'me' : 'them');
+    if (key) div.dataset.msgKey = key;
+    const time = m.ts
+      ? new Date(m.ts).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})
+      : '';
+    div.innerHTML =
+      (!isMe ? `<div class="msg-name">${esc(m.name)}</div>` : '') +
+      `<div class="msg-bbl">${esc(m.text||'')}</div>` +
+      `<div class="msg-time">${time}</div>`;
+
+    // Double-tap → heart reaction
+    if (key) attachDoubleTap(div, key);
+    return div;
   }
 
-  div.innerHTML = `
-    <div class="msg-hdr">
-      ${!isMe ? `<span class="msg-name">${esc(m.name)}</span>` : ''}
-      <button class="reply-btn" onclick="setReply('${key}','${esc(m.name)}','${esc(m.text)}')">↩️</button>
-      ${isMe ? `<span class="msg-name">${esc(m.name)}</span>` : ''}
-    </div>
-    <div class="msg-bbl">${replyHtml}${esc(m.text)}</div>
-  `;
-  
-  // Добавляем прослушку двойного клика для сердечек
-  if (key) attachDoubleTap(div, key);
-
-  return div;
+  return null;
 }
 
-/* ── DOUBLE TAP REACTIONS (HEARTS) ── */
+// ── Double-tap heart reaction ──
 function attachDoubleTap(div, key) {
   let lastTapTime = 0;
   let touchHandled = false;
 
+  // Touch: manual double-tap detection
   div.addEventListener('touchend', e => {
-    if (e.target.closest('.reply-btn') || e.target.closest('.msg-reply-block')) return;
-    
     touchHandled = true;
+    // Reset flag after the synthetic click fires (~300ms)
     clearTimeout(div._thReset);
     div._thReset = setTimeout(() => { touchHandled = false; }, 600);
 
+    e.stopPropagation();
     const now = Date.now();
     if (now - lastTapTime < 380) {
       lastTapTime = 0;
@@ -747,13 +2091,14 @@ function attachDoubleTap(div, key) {
     }
   }, { passive: true });
 
-  div.addEventListener('dblclick', (e) => {
-    if (e.target.closest('.reply-btn') || e.target.closest('.msg-reply-block')) return;
-    if (touchHandled) return;
+  // Mouse (desktop only): use native dblclick, ignore if already handled by touch
+  div.addEventListener('dblclick', () => {
+    if (touchHandled) return; // already handled by touchend above
     toggleHeart(key, div);
   });
 }
 
+const _heartThrottle = {};
 function toggleHeart(key, div) {
   const now = Date.now();
   if (_heartThrottle[key] && now - _heartThrottle[key] < 600) return;
@@ -761,17 +2106,17 @@ function toggleHeart(key, div) {
 
   const safeKey = myName.replace(/[.#$\/\[\]]/g,'_');
   const heartRef = ref(db, 'rooms/' + roomId + '/reactions/' + key + '/hearts/' + safeKey);
-
+  // Flash the bubble
   const bbl = div.querySelector('.msg-bbl');
-  if (bbl) {
-    bbl.classList.remove('tap-flash'); void bbl.offsetWidth; bbl.classList.add('tap-flash');
-  }
-
+  if (bbl) { bbl.classList.remove('tap-flash'); void bbl.offsetWidth; bbl.classList.add('tap-flash'); }
+  // Toggle in Firebase
   get(heartRef).then(snap => {
-    if (snap.exists()) remove(heartRef); else set(heartRef, true);
+    if (snap.exists()) remove(heartRef);
+    else set(heartRef, true);
   });
 }
 
+// ── Attach Firebase reactions listener ──
 function initReactions() {
   onValue(db_reactions, snap => {
     const data = snap.val() || {};
@@ -789,24 +2134,20 @@ function updateHeartBadge(div, hearts) {
     if (badge) badge.remove();
     return;
   }
-
+  // Attach heart to the bubble element, not to the message wrapper,
+  // so it overlaps the bottom of the bubble (not the timestamp below it)
   const bbl = div.querySelector('.msg-bbl');
   if (!bbl) return;
-
   if (!badge) {
     badge = document.createElement('div');
     badge.className = 'msg-heart';
     bbl.appendChild(badge);
   }
-
   const prev = badge.dataset.count;
   badge.dataset.count = hearts.length;
-
-  badge.innerHTML = '❤️' + (hearts.length > 1 ? ` <span style="margin-left:2px">${hearts.length}</span>` : '');
-
-  if (prev !== String(hearts.length)) {
-    badge.classList.remove('pop'); void badge.offsetWidth; badge.classList.add('pop');
-  }
+  // Always use red heart emoji regardless of who liked it
+  badge.innerHTML = '❤️' + (hearts.length > 1 ? ` <span>${hearts.length}</span>` : '');
+  if (prev !== String(hearts.length)) { badge.classList.remove('pop'); void badge.offsetWidth; badge.classList.add('pop'); }
 }
 
 function spawnFloat(emoji, anchor) {
@@ -815,20 +2156,74 @@ function spawnFloat(emoji, anchor) {
   f.className = 'floater';
   f.textContent = emoji;
   f.style.left = (r.left + r.width/2 - 13) + 'px';
-  f.style.top = (r.top - 10) + 'px';
+  f.style.top  = (r.top  - 10) + 'px';
   document.body.appendChild(f);
   f.addEventListener('animationend', () => f.remove());
 }
 
-/* ── PRESENCE ── */
-function initPresence() {
-  const presRoomRef = ref(db, 'rooms/' + roomId + '/pres');
-  onValue(presRoomRef, snap => {
-    const data = snap.val() || {};
-    const others = Object.values(data).filter(u => u && u.name && u.name !== myName);
-    $('status-bar').innerHTML = others.map(u => `<span class="sb-item"><b>${esc(u.name)}</b> здесь</span>`).join('');
+/* ═══════════════════════════════════════════════════════
+   DRAWER / CHAT OPEN STATE
+   Mobile: chat is always visible, so drawerOpen = true always.
+   Desktop: no drawer needed either — chat is a fixed side panel.
+═══════════════════════════════════════════════════════ */
+function initDrawer() {
+  // On mobile the chat is always visible (stacked layout).
+  // Set drawerOpen=true so unread badge logic knows chat is in view.
+  if (window.innerWidth < 768) {
+    drawerOpen = true;
+  }
+  // Desktop: chat column is always visible — nothing to open/close.
+}
+
+/* ═══════════════════════════════════════════════════════
+   iOS KEYBOARD (visualViewport)
+═══════════════════════════════════════════════════════ */
+function initKeyboard() {
+  // On mobile chat is always visible → drawerOpen stays true
+  if (window.innerWidth < 768) drawerOpen = true;
+  window.addEventListener('resize', () => {
+    if (window.innerWidth < 768) drawerOpen = true;
   });
-  setInterval(() => set(db_pres_me, { name: myName, online: true }), 5000);
+
+  if (!window.visualViewport) return;
+
+  const app = $('app');
+
+  // Pin #app to the visual viewport at all times.
+  // This keeps both the video AND the chat input visible above the keyboard.
+  function onVPResize() {
+    const vv  = window.visualViewport;
+    const top = Math.round(vv.offsetTop);
+    const h   = Math.round(vv.height);
+    // Fix the app to exactly the visible area
+    app.style.position = 'fixed';
+    app.style.top      = top + 'px';
+    app.style.left     = '0';
+    app.style.width    = '100%';
+    app.style.height   = h + 'px';
+
+    // Scroll messages to bottom when keyboard opens/closes
+    const msgs = $('msgs');
+    if (msgs) requestAnimationFrame(() => { msgs.scrollTop = msgs.scrollHeight; });
+  }
+
+  window.visualViewport.addEventListener('resize', onVPResize);
+  window.visualViewport.addEventListener('scroll', onVPResize);
+
+  // Fix for "input not above keyboard on quick re-focus":
+  // When textarea is focused, force a layout recalculation after a small delay
+  const ta = $('chat-ta');
+  if (ta) {
+    ta.addEventListener('focus', () => {
+      setTimeout(() => {
+        onVPResize();
+        ta.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+      }, 200);
+    });
+  }
+
+  // Initial call
+  onVPResize();
 }
 
 </script>
