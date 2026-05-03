@@ -536,7 +536,7 @@ body {
 #msgs::-webkit-scrollbar { width: 3px; }
 #msgs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-.msg { max-width: 85%; display: flex; flex-direction: column; gap: 2px; }
+.msg { max-width: 85%; display: flex; flex-direction: column; gap: 2px; position: relative; }
 .msg.me  { align-self: flex-end;   align-items: flex-end; }
 .msg.them{ align-self: flex-start; align-items: flex-start; }
 .msg.sys { align-self: center; max-width: 100%; align-items: center; }
@@ -557,7 +557,7 @@ body {
   position: relative; align-self: flex-end;
 }
 .msg-heart {
-  position: absolute; bottom: -8px; right: 6px;
+  position: absolute; bottom: -10px; right: 4px;
   background: var(--s1); border: 1px solid var(--border);
   border-radius: 20px; padding: 1px 5px;
   font-size: 11px; display: flex; align-items: center; gap: 2px;
@@ -774,7 +774,7 @@ body {
     <button class="lock-enter" id="enter-btn">Войти в кино →</button>
     <div class="chat-only-row">
       <input type="checkbox" id="chat-only-cb">
-      <label for="chat-only-cb">Только чат</label>
+      <label for="chat-only-cb">Только чат (без видео — для телефона партнёра)</label>
     </div>
     <div class="lock-err" id="lock-err"></div>
 
@@ -973,7 +973,7 @@ const FB_CONFIG = {
   appId:             "1:970156344935:web:74ecce58fb40f4579636c2"
 };
 const PASSWORD = 'love123';
-const SYNC_DRIFT   = 2.5;   // seconds before force-seek
+const SYNC_DRIFT   = 5;     // seconds before force-seek (allows natural drift)
 const CTRL_TIMEOUT = 2500;  // ms before controls auto-hide
 const HB_INTERVAL  = 5000;  // heartbeat ms
 
@@ -1012,8 +1012,9 @@ let ctrlVisible = true;
 let progDragging = false;
 let knownMsgKeys = new Set();
 let chatOnlyMode = false;
-let lastPlayTs   = 0;
-let ytSyncTimer  = null; // debounce timer for YT state changes
+let lastPlayTs        = 0;
+let ytSyncTimer       = null; // debounce timer for YT state changes
+let lastLocalActionTs = 0;    // timestamp of last local play/pause/seek — used to guard against stale remote commands
 
 /* ═══════════════════════════════════════════════════════
    ENTRY
@@ -1212,6 +1213,8 @@ function loadMP4(src) {
   setYTMode(false);
   v.load();
   applyVtt();
+  const cb = $('clear-btn');
+  if (cb) cb.style.display = '';   // show ✕ button
   toast('Загружаю видео…');
 }
 
@@ -1223,6 +1226,8 @@ function loadYT(id) {
   $('ph').style.display = 'none';
   isYT = true;
   setYTMode(true);
+  const cb = $('clear-btn');
+  if (cb) cb.style.display = '';   // show ✕ button
   // Load YT API if needed
   if (window.YT && window.YT.Player) { buildYT(id); return; }
   window.__ytCb = () => buildYT(id);
@@ -1677,18 +1682,20 @@ function initKeyboardShortcuts() {
 ═══════════════════════════════════════════════════════ */
 let lastPushTs = 0;
 
-function pushSync() {
+function pushSync(isHeartbeat = false) {
   // Пункт 1: в режиме «только чат» не отправляем команды управления
   if (chatOnlyMode) return;
   const now = Date.now();
   lastPushTs = now;
+  if (!isHeartbeat) lastLocalActionTs = now;  // record explicit user action
   const payload = {
-    url:     lastPushedUrl || $('url-inp').value.trim(),
+    url:         lastPushedUrl || $('url-inp').value.trim(),
     isYT,
-    playing: isPlaying(),
-    time:    getCur(),
-    by:      myName,
-    ts:      now
+    playing:     isPlaying(),
+    time:        getCur(),
+    by:          myName,
+    ts:          now,
+    isHeartbeat: isHeartbeat   // flag: heartbeat vs explicit user action
   };
   set(db_sync, payload).catch(e => console.error('pushSync error:', e));
 }
@@ -1729,43 +1736,72 @@ function initSync() {
     console.error('sync listener error:', err);
   });
 
-  // Heartbeat: push state every N seconds so late-joiner syncs.
-  // Only push during playback (not paused) to avoid unnecessary seek commands.
+  // Heartbeat: only for late-joiners (time sync).
+  // Marked as isHeartbeat=true so the remote side won't override play/pause state.
   setInterval(() => {
-    if (lastPushedUrl && !suppressSync && isPlaying()) pushSync();
+    if (lastPushedUrl && !suppressSync && isPlaying()) pushSync(true);
   }, HB_INTERVAL);
 }
 
 function applyRemote(d) {
-  const ageSec    = (Date.now() - (d.ts || 0)) / 1000;
+  const ageSec     = (Date.now() - (d.ts || 0)) / 1000;
   const targetTime = d.playing
-    ? (d.time || 0) + ageSec   // compensate latency
+    ? (d.time || 0) + ageSec   // compensate network latency
     : (d.time || 0);
 
-  // Пункт 2: синхронизация «по медленному»
-  // Если мы ОПЕРЕЖАЕМ Firebase на >2с — тянемся назад (ждём отставшего)
-  // Если мы ОТСТАЁМ более чем на 30с — догоняем (например, только зашли)
-  // Если отстаём менее чем на 30с — не трогаем, пусть догоняет сам
-  const drift = getCur() - targetTime; // > 0 = я впереди
+  // ── Seek sync (applies to both heartbeats and explicit actions) ──
+  // «Sync by slowest»: if we're ahead → pull back.
+  // If we're way behind (new joiner / reconnect) → catch up.
+  // Small drift (< SYNC_DRIFT) → ignore, natural playback handles it.
+  const drift = getCur() - targetTime; // positive = we're ahead
+
+  if (d.isHeartbeat) {
+    // Heartbeat: only fix large drifts (late-joiner recovery)
+    // Do NOT touch play/pause — that would override local user actions
+    if (Math.abs(drift) > 15) {
+      seekAbs(targetTime, false);
+      setSS('warn', 'Синхронизация…');
+      setTimeout(() => setSS('ok', 'Синхронизировано'), 1500);
+    } else {
+      setSS('ok', 'Синхронизировано');
+    }
+    return; // ← heartbeats never change play/pause state
+  }
+
+  // ── Explicit user action ──
+  // Only apply if the remote action is newer than our last local action.
+  // This prevents stale remote commands from overriding what we just did.
+  const remoteTs = d.ts || 0;
+  if (remoteTs <= lastLocalActionTs) {
+    // Remote action is older than what we already did locally — ignore play/pause,
+    // but still apply seek if drift is huge (safety net)
+    if (Math.abs(drift) > 30) seekAbs(targetTime, false);
+    return;
+  }
+
+  // Apply seek if needed
   if (drift > SYNC_DRIFT) {
+    // We're ahead → pull back to match remote (sync by slowest)
     seekAbs(targetTime, false);
     setSS('warn', 'Синхронизация…');
     setTimeout(() => setSS('ok', 'Синхронизировано'), 1500);
   } else if (drift < -30) {
-    // Сильно отстали (новый участник или пропала связь): догоняем
+    // Far behind → catch up
     seekAbs(targetTime, false);
     setSS('warn', 'Синхронизация…');
     setTimeout(() => setSS('ok', 'Синхронизировано'), 1500);
+  } else if (Math.abs(drift) > 2) {
+    // Moderate drift from explicit seek → apply immediately
+    seekAbs(targetTime, false);
   } else {
     setSS('ok', 'Синхронизировано');
   }
 
-  // Play / pause
+  // Apply play/pause state
   if (d.playing && !isPlaying()) {
     if (isYT) { if (ytPlayer) ytPlayer.playVideo(); }
     else {
       $('vid').play().catch(() => {
-        // iOS заблокировал автовоспроизведение — показываем кнопку
         const ttp = $('tap-to-play');
         if (ttp) ttp.style.display = 'flex';
       });
@@ -2093,12 +2129,42 @@ function initKeyboard() {
   });
 
   if (!window.visualViewport) return;
+
+  // When the virtual keyboard appears on mobile:
+  // - Move the entire ccol up by the keyboard height using translateY
+  // - This way the video above stays visible (not pushed off screen)
+  // - The chat input sticks right above the keyboard with no dead space
+  const ccol = $('ccol');
   const wrap = $('chat-inp-wrap');
-  window.visualViewport.addEventListener('resize', () => {
-    const kbH = Math.max(0, window.innerHeight - window.visualViewport.height);
-    wrap.style.paddingBottom = (kbH + 8) + 'px';
+
+  function onVPResize() {
+    if (window.innerWidth >= 768) return; // desktop: do nothing
+
+    const vv      = window.visualViewport;
+    const winH    = window.innerHeight;
+    const vvTop   = vv.offsetTop;
+    const vvH     = vv.height;
+
+    // Keyboard height = window height minus viewport height minus viewport top offset
+    const kbH = Math.max(0, winH - vvTop - vvH);
+
+    if (kbH > 50) {
+      // Keyboard is open: shift ccol up, remove safe-area bottom pad
+      ccol.style.transform    = `translateY(-${kbH}px)`;
+      ccol.style.marginBottom = `-${kbH}px`;  // prevent layout gap
+      wrap.style.paddingBottom = '8px';         // no safe-area when kb open
+    } else {
+      // Keyboard closed: restore
+      ccol.style.transform     = '';
+      ccol.style.marginBottom  = '';
+      wrap.style.paddingBottom = '';            // CSS env() takes over again
+    }
+
     $('msgs').scrollTop = $('msgs').scrollHeight;
-  });
+  }
+
+  window.visualViewport.addEventListener('resize', onVPResize);
+  window.visualViewport.addEventListener('scroll', onVPResize);
 }
 
 </script>
