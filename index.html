@@ -543,18 +543,6 @@ body {
   margin-right: 5px; animation: blink 2s infinite;
 }
 
-/* Reactions */
-#react-bar {
-  display: flex; gap: 5px; padding: 7px 10px 0; flex-shrink: 0;
-}
-.rb {
-  background: none; border: 1px solid var(--border);
-  border-radius: 8px; padding: 4px 8px;
-  font-size: 15px; cursor: pointer; -webkit-appearance: none;
-  transition: border-color .12s, transform .1s, background .12s;
-}
-.rb:hover { border-color: var(--accent); background: rgba(201,149,110,.08); }
-.rb:active { transform: scale(.8); }
 
 /* Messages list */
 #msgs {
@@ -1018,16 +1006,6 @@ body {
 
     <!-- Participant timecodes -->
     <div id="status-bar"></div>
-
-    <!-- Reactions -->
-    <div id="react-bar">
-      <button class="rb" data-e="❤️">❤️</button>
-      <button class="rb" data-e="😂">😂</button>
-      <button class="rb" data-e="😱">😱</button>
-      <button class="rb" data-e="👏">👏</button>
-      <button class="rb" data-e="🍿">🍿</button>
-      <button class="rb" data-e="💋">💋</button>
-    </div>
 
     <!-- Messages -->
     <div id="msgs"></div>
@@ -2056,16 +2034,7 @@ function initChat() {
       }
     }
   }, () => {});
-
-  // Reaction buttons
-  document.querySelectorAll('.rb').forEach(btn => {
-    btn.onclick = () => {
-      const emoji = btn.dataset.e;
-      push(db_chat, { type:'reaction', emoji, name:myName, ts: serverTimestamp() })
-        .catch(e => console.error('reaction push:', e));
-      spawnFloat(emoji, btn);
-    };
-  });
+  
 
   // Пункт 4: быстрые фразы
   document.querySelectorAll('.qp-btn').forEach(btn => {
@@ -2351,8 +2320,9 @@ function initKeyboard() {
     app.style.height   = h + 'px';
 
     // Detect keyboard open in portrait: app height < 78% of screen height
-    const isPortrait = window.innerWidth < window.innerHeight;
-    const kbOpen     = h < window.innerHeight * 0.78 && isPortrait;
+    const isPortrait  = window.innerWidth < window.innerHeight;
+    const screenH     = window.screen.height;
+    const kbOpen      = isPortrait && h < screenH * 0.65;
     app.classList.toggle('kb-open', kbOpen);
 
     // Scroll messages to bottom when keyboard opens/closes
