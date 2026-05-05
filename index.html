@@ -794,7 +794,9 @@ body {
   border-radius: 6px; padding: 4px 8px;
   margin-bottom: 5px; cursor: pointer;
   font-size: 11px; color: var(--dim);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden;
+  max-width: 100%;
   transition: background .15s;
 }
 .msg-quote:hover { background: rgba(201,149,110,.12); }
