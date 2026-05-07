@@ -214,7 +214,6 @@ body {
   }
   /* Compact chat chrome to maximize message area */
   #status-bar       { display: none; }
-  #react-bar        { display: none; }
   #quick-phrases    { display: none; }
   #typing-indicator { display: none; }
   #chat-inp-wrap    { padding-top: 4px; padding-bottom: 4px; }
@@ -651,16 +650,6 @@ body {
   -webkit-appearance: none; transition: opacity .15s, transform .1s;
 }
 #send-btn:active { transform: scale(.87); opacity: .85; }
-
-/* ── Floating reactions ── */
-.floater {
-  position: fixed; font-size: 26px; pointer-events: none; z-index: 9000;
-  animation: floatUp 1.5s ease-out forwards;
-}
-@keyframes floatUp {
-  0%   { transform: translateY(0) scale(1); opacity: 1; }
-  100% { transform: translateY(-120px) scale(1.5); opacity: 0; }
-}
 
 /* ═══════════════════════════════════════════════════════
    CHAT-ONLY MODE (controller mode)
@@ -1161,7 +1150,6 @@ function tryEnter() {
   initPresence();
   initKeyboard();           // always — iOS keyboard needs this in every mode
   if (!chatOnlyMode) {
-    initDrawer();
     initKeyboardShortcuts();
   }
 
@@ -2278,30 +2266,11 @@ function updateHeartBadge(div, hearts) {
   if (prev !== String(hearts.length)) { badge.classList.remove('pop'); void badge.offsetWidth; badge.classList.add('pop'); }
 }
 
-function spawnFloat(emoji, anchor) {
-  const r = anchor.getBoundingClientRect();
-  const f = document.createElement('div');
-  f.className = 'floater';
-  f.textContent = emoji;
-  f.style.left = (r.left + r.width/2 - 13) + 'px';
-  f.style.top  = (r.top  - 10) + 'px';
-  document.body.appendChild(f);
-  f.addEventListener('animationend', () => f.remove());
-}
-
 /* ═══════════════════════════════════════════════════════
    DRAWER / CHAT OPEN STATE
    Mobile: chat is always visible, so drawerOpen = true always.
    Desktop: no drawer needed either — chat is a fixed side panel.
 ═══════════════════════════════════════════════════════ */
-function initDrawer() {
-  // On mobile the chat is always visible (stacked layout).
-  // Set drawerOpen=true so unread badge logic knows chat is in view.
-  if (window.innerWidth < 768) {
-    drawerOpen = true;
-  }
-  // Desktop: chat column is always visible — nothing to open/close.
-}
 
 /* ═══════════════════════════════════════════════════════
    iOS KEYBOARD (visualViewport)
