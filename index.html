@@ -755,7 +755,6 @@ body {
 #toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ── Keyboard-open mode: collapse chrome to show messages + video ── */
-#app.kb-open #react-bar       { display: none !important; }
 #app.kb-open #status-bar      { display: none !important; }
 #app.kb-open #quick-phrases   { display: none !important; }
 #app.kb-open #typing-indicator{ min-height: 0; padding: 0 12px 2px; }
@@ -1265,6 +1264,7 @@ function clearVideoLocally() {
   destroyYT();
   $('yt-wrap').classList.remove('on');
   $('yt-wrap').style.display = '';
+  setYTMode(false);
   $('ph').style.display = '';
 }
 
@@ -1581,15 +1581,6 @@ function initPlayer() {
   $('player-wrap').addEventListener('mousemove', showCtrl);
 
   /* ── Video element events ── */
-  function syncPlayIcon(playing) {
-    $('play-btn').textContent = playing ? '⏸' : '▶';
-    const svg = $('centre-icon');
-    if (svg) {
-      svg.innerHTML = playing
-        ? '<rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/>'
-        : '<polygon points="5,3 19,12 5,21"/>';
-    }
-  }
   v.addEventListener('play',  () => { syncPlayIcon(true);  lastPlayTs = Date.now(); });
   v.addEventListener('pause', () => {
     syncPlayIcon(false);
@@ -1624,6 +1615,17 @@ function initPlayer() {
   );
 }
 
+  /* Sync play/pause icon — module-level so buildYT can reach it */
+function syncPlayIcon(playing) {
+  $('play-btn').textContent = playing ? '⏸' : '▶';
+  const svg = $('centre-icon');
+  if (svg) {
+    svg.innerHTML = playing
+      ? '<rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/>'
+      : '<polygon points="5,3 19,12 5,21"/>';
+  }
+}
+  
 /* Player helpers */
 function isPlaying() {
   if (isYT) return ytPlayer ? ytPlayer.getPlayerState() === 1 : false;
@@ -1850,7 +1852,9 @@ function initSync() {
 
   // Heartbeat: only for late-joiners (time sync).
   setInterval(() => {
-    if (lastPushedUrl && !suppressSync && isPlaying()) pushSync(true);
+    try {
+      if (lastPushedUrl && !suppressSync && isPlaying()) pushSync(true);
+    } catch(_) {}
   }, HB_INTERVAL);
 }
 
