@@ -924,7 +924,7 @@ body {
       </div>
 
       <!-- Native video -->
-      <video id="vid" playsinline webkit-playsinline preload="metadata"></video>
+      <video id="vid" playsinline webkit-playsinline preload="auto"></video>
 
       <!-- YouTube -->
       <div id="yt-wrap">
@@ -1298,7 +1298,7 @@ function setYTMode(yt) {
 function loadMP4(src) {
   destroyYT();
   const v = $('vid');
-  v.preload = 'metadata';
+  v.preload = 'auto';
   v.src = src;
   v.style.display = 'block';
   $('yt-wrap').classList.remove('on');
@@ -1588,6 +1588,22 @@ function initPlayer() {
       updateProgValues(ytPlayer.getCurrentTime(), ytPlayer.getDuration());
     }
   }, 500);
+
+  /* ── YT state polling — iOS fallback (onStateChange ненадёжен на Safari) ── */
+  let _ytPollState = -1;
+  setInterval(() => {
+    if (!isYT || !ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
+    try {
+      const s = ytPlayer.getPlayerState();
+      if (s === _ytPollState) return;
+      _ytPollState = s;
+      if (s === YT.PlayerState.BUFFERING || s === YT.PlayerState.UNSTARTED) return;
+      if (!suppressSync && !chatOnlyMode) {
+        clearTimeout(ytSyncTimer);
+        ytSyncTimer = setTimeout(() => pushSync(), 600);
+      }
+    } catch(_) {}
+  }, 1000);
 
   /* ── Fullscreen change ── */
   const FS_ICON_ENTER = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
@@ -2311,6 +2327,7 @@ function initKeyboard() {
 
   window.visualViewport.addEventListener('resize', onVPResize);
   window.visualViewport.addEventListener('scroll', onVPResize);
+  window.addEventListener('resize', onVPResize);
 
   // Fix for "input not above keyboard on quick re-focus":
   // When textarea is focused, force a layout recalculation after a small delay
@@ -2320,7 +2337,7 @@ function initKeyboard() {
       setTimeout(() => {
         onVPResize();
         ta.scrollIntoView({ behavior: 'instant', block: 'nearest' });
-      }, 200);
+      }, 350);
     });
   }
 
