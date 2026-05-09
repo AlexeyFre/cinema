@@ -837,10 +837,9 @@ body.pseudo-fs #ccol {
 #fs-notif {
   position: fixed;
   top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 16px;
   z-index: 600;
-  background: rgba(9,9,15,.85);
+  background: rgba(9,9,15,.55);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border2);
@@ -856,7 +855,7 @@ body.pseudo-fs #ccol {
   opacity: 0;
 }
 #fs-notif.on  { display: flex; opacity: 1; }
-#fs-notif.off { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+#fs-notif.off { opacity: 0; transform: translateY(-12px); }
 #fs-notif-name { font-size: 11px; color: var(--accent); letter-spacing: .05em; }
 #fs-notif-text { font-size: 13px; color: var(--text); line-height: 1.4; word-break: break-word; }
   
@@ -1589,23 +1588,29 @@ function initPlayer() {
        Centre 20% → ignored (safe zone)
   ────────────────────────────────────────────────────────────────── */
   let tapTimer = null, tapCount = 0, tapX = 0;
+  let swipeSY = 0, swipeSX = 0, swipeST = 0;
 
-  // touchstart: show controls immediately on any finger-down
-  // This is the "first touch shows UI" mechanism — the panel appears
-  // the instant the finger touches the screen, not on release.
   $('player-wrap').addEventListener('touchstart', e => {
-    // Don't interfere with ctrl-bar or centre-btn interactions
     if (e.target.closest('#ctrl-bar')) return;
     if (e.target.closest('#centre-btn')) return;
-    // Show controls immediately, reset auto-hide timer
+    swipeSY = e.touches[0].clientY;
+    swipeSX = e.touches[0].clientX;
+    swipeST = Date.now();
     showCtrl();
   }, { passive: true });
 
   $('player-wrap').addEventListener('touchend', e => {
-    // ctrl-bar and centre-btn have their own handlers (and are blocked by
-    // CSS pointer-events:none when panel is hidden — so this is safe)
     if (e.target.closest('#ctrl-bar')) return;
     if (e.target.closest('#centre-btn')) return;
+
+    // Свайп вниз → выход из псевдофулскрина
+    const swipeDy = e.changedTouches[0].clientY - swipeSY;
+    const swipeDx = Math.abs(e.changedTouches[0].clientX - swipeSX);
+    const swipeMs = Date.now() - swipeST;
+    if (pseudoFSActive && swipeDy > 80 && swipeDx < 60 && swipeMs < 500) {
+      togglePseudoFS();
+      return;
+    }
 
     tapCount++;
     tapX = e.changedTouches[0].clientX;
@@ -1650,6 +1655,7 @@ function initPlayer() {
   v.addEventListener('timeupdate',     updateProg);
   v.addEventListener('durationchange', updateProg);
   v.addEventListener('waiting',        () => setSS('warn','Буферизация…'));
+  v.addEventListener('loadedmetadata', updateCtrlBarPosition);
   v.addEventListener('canplay',        () => setSS('ok','Синхронизировано'));
 
   /* ── YT progress ticker ── */
@@ -1683,9 +1689,10 @@ function initPlayer() {
       const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
       $('fs-btn').innerHTML = isFS ? FS_ICON_EXIT : FS_ICON_ENTER;
       showCtrl();
+      setTimeout(updateCtrlBarPosition, 50);
     })
   );
-}
+  window.addEventListener('resize', updateCtrlBarPosition);
 
   /* Sync play/pause icon — module-level so buildYT can reach it */
 function syncPlayIcon(playing) {
@@ -1806,6 +1813,40 @@ function showSeekFeedback(seconds) {
   el._t = setTimeout(() => { el.style.opacity = '0'; }, 800);
 }
 
+
+  function updateCtrlBarPosition() {
+  const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const ctrlBar = $('ctrl-bar');
+  if (!pseudoFSActive && !isFS) {
+    ctrlBar.style.position = '';
+    ctrlBar.style.bottom   = '';
+    ctrlBar.style.left     = '';
+    ctrlBar.style.right    = '';
+    return;
+  }
+  const v  = $('vid');
+  if (!v.videoWidth || !v.videoHeight) return;
+  const pw = $('player-wrap');
+  const cw = pw.clientWidth;
+  const ch = pw.clientHeight;
+  const vr = v.videoWidth / v.videoHeight;
+  const cr = cw / ch;
+  if (vr > cr) {
+    // Широкоэкранное видео в вертикальном экране — чёрные полосы сверху и снизу
+    const renderedH  = cw / vr;
+    const blackBarH  = (ch - renderedH) / 2;
+    ctrlBar.style.position = 'absolute';
+    ctrlBar.style.bottom   = Math.max(0, blackBarH) + 'px';
+    ctrlBar.style.left     = '0';
+    ctrlBar.style.right    = '0';
+  } else {
+    ctrlBar.style.position = '';
+    ctrlBar.style.bottom   = '';
+    ctrlBar.style.left     = '';
+    ctrlBar.style.right    = '';
+  }
+}
+  
 /* Fullscreen — with iPhone fallback (webkitEnterFullscreen on <video>) */
 function toggleFS() {
   // iOS Safari: стандартный fullscreen API недоступен — используем псевдорежим
@@ -1830,6 +1871,7 @@ function togglePseudoFS() {
   $('fs-btn').innerHTML = pseudoFSActive ? FS_ICON_EXIT : FS_ICON_ENTER;
   if (!pseudoFSActive) dismissFsNotif();
   showCtrl();
+  setTimeout(updateCtrlBarPosition, 50);
 }
 
 function showFsNotif(key, name, text) {
@@ -1875,7 +1917,7 @@ function initFsNotif() {
   el.addEventListener('touchend', e => {
     const dx = Math.abs(e.changedTouches[0].clientX - swipeStartX);
     const dy = Math.abs(e.changedTouches[0].clientY - swipeStartY);
-    if (dx > 50 || dy > 50) dismissFsNotif();
+    if (dx > 35 || dy > 35) dismissFsNotif();
   }, { passive: true });
 }
 
