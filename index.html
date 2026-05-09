@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#09090f">
@@ -1640,7 +1641,13 @@ function isPlaying() {
   const v = $('vid'); return !v.paused && !v.ended;
 }
 function getCur() {
-  if (isYT) return ytPlayer ? ytPlayer.getCurrentTime() : 0;
+  if (isYT) {
+    try {
+      return ytPlayer && typeof ytPlayer.getCurrentTime === 'function'
+        ? ytPlayer.getCurrentTime()
+        : 0;
+    } catch(_) { return 0; }
+  }
   return $('vid').currentTime || 0;
 }
 function getDur() {
