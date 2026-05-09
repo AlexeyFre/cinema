@@ -1312,7 +1312,11 @@ function loadMP4(src) {
   toast('Загружаю видео…');
 }
 
+let ytLoadingId = null; // защита от двойного вызова
+
 function loadYT(id) {
+  if (ytLoadingId === id) return; // уже грузим этот же ролик — игнорируем
+  ytLoadingId = id;
   $('vid').style.display = 'none';
   $('vid').src = '';
   destroyYT();
@@ -1321,8 +1325,7 @@ function loadYT(id) {
   isYT = true;
   setYTMode(true);
   const cb = $('clear-btn');
-  if (cb) cb.style.display = '';   // show ✕ button
-  // Load YT API if needed
+  if (cb) cb.style.display = '';
   if (window.YT && window.YT.Player) { buildYT(id); return; }
   window.__ytCb = () => buildYT(id);
   if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
@@ -2037,7 +2040,7 @@ function initChat() {
     const data = snap.val() || {};
     const safeMyKey = myName.replace(/[.#$\/\[\]]/g,'_');
     const others = Object.entries(data)
-      .filter(([k, v]) => k !== safeMyKey && v && v.name)
+      .filter(([k, v]) => k !== safeMyKey && v && v.name && (Date.now() - (v.ts || 0) < 8000))
       .map(([, v]) => v.name);
     const el = $('typing-indicator');
     if (el) {
