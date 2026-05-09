@@ -1465,236 +1465,8 @@ function applyVtt() {
 /* ═══════════════════════════════════════════════════════
    PLAYER CONTROLS
 ═══════════════════════════════════════════════════════ */
-function initPlayer() {
-  const v   = $('vid');
-  const pw  = $('prog-wrap');
-  const vol = $('vol-range');
 
-  /* Play / Pause button (bottom bar) */
-  $('play-btn').onclick = e => { e.stopPropagation(); togglePlay(); pushSync(); };
-
-  /* Centre play/pause button */
-  $('centre-btn').onclick = e => { e.stopPropagation(); togglePlay(); pushSync(); showCtrl(); };
-
-  /* YT tap shield — desktop: click toggles play; mobile: pass through to YT */
-  $('yt-shield').onclick = e => {
-    e.stopPropagation();
-    if (!isTouchDevice()) {
-      // Desktop: our click handler controls play/pause
-      togglePlay(); pushSync(); showCtrl();
-    } else {
-      // Mobile: just show controls, let YT iframe handle actual play via its own touch
-      showCtrl();
-    }
-  };
-
-  /* Skip */
-  $('back-btn').onclick = e => { e.stopPropagation(); seekRel(-10); };
-  $('fwd-btn').onclick  = e => { e.stopPropagation(); seekRel(+10); };
-
-  /* ── Progress drag ── */
-  function seekFromX(clientX) {
-    const r = pw.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
-    const dur = getDur();
-    if (!dur) return;
-    seekAbs(pct * dur, false);
-  }
-  pw.addEventListener('mousedown', e => {
-    progDragging = true; pw.classList.add('drag');
-    seekFromX(e.clientX); e.preventDefault(); e.stopPropagation();
-  });
-  pw.addEventListener('touchstart', e => {
-    progDragging = true; pw.classList.add('drag');
-    seekFromX(e.touches[0].clientX); showCtrl(); e.stopPropagation();
-  }, { passive: true });
-  document.addEventListener('mousemove', e => {
-    if (progDragging) seekFromX(e.clientX);
-  });
-  document.addEventListener('touchmove', e => {
-    if (progDragging) seekFromX(e.touches[0].clientX);
-  }, { passive: true });
-  function endDrag() {
-    if (!progDragging) return;
-    progDragging = false;
-    $('prog-wrap').classList.remove('drag');
-    pushSync();
-  }
-  document.addEventListener('mouseup',   endDrag);
-  document.addEventListener('touchend',  endDrag);
-
-  /* Volume */
-  vol.oninput = e => {
-    v.volume = +e.target.value;
-    $('mute-btn').textContent = +e.target.value > 0 ? '🔊' : '🔇';
-  };
-  $('mute-btn').onclick = e => {
-    e.stopPropagation();
-    v.muted = !v.muted;
-    $('mute-btn').textContent = v.muted ? '🔇' : '🔊';
-  };
-  $('vol-range').onclick = e => e.stopPropagation();
-
-  /* Fullscreen */
-  $('fs-btn').onclick = e => { e.stopPropagation(); toggleFS(); };
-
-  /* Tap-to-play overlay (iOS autoplay blocked) */
-  const ttp = $('tap-to-play');
-  if (ttp) {
-    ttp.addEventListener('click', () => {
-      const v = $('vid');
-      v.play().then(() => { ttp.style.display = 'none'; }).catch(() => {});
-    });
-    ttp.addEventListener('touchend', e => {
-      e.preventDefault();
-      const v = $('vid');
-      v.play().then(() => { ttp.style.display = 'none'; }).catch(() => {});
-    });
-  }
-
-  /* iOS: скрываем tap-to-play при успешном старте */
-  v.addEventListener('play', () => {
-    if (ttp) ttp.style.display = 'none';
-  });
-
-  /* ── Desktop: click anywhere on video = play/pause ──
-     On touch devices 'click' fires after touchend — we must ignore it
-     there to prevent ghost pauses. Only real mouse clicks count.
-  ── */
-  $('player-wrap').addEventListener('click', e => {
-    if (isTouchDevice()) return;            // mobile: never pause via click
-    if (e.target.closest('#ctrl-bar'))   return;
-    if (e.target.closest('#centre-btn')) return;
-    if (e.target.closest('#sync-pill'))  return;
-    if (e.target.closest('#user-pill'))  return;
-    if (e.target.closest('#yt-shield'))  return;
-    togglePlay(); pushSync(); showCtrl();
-  });
-
-  /* ── Mobile tap handling ─────────────────────────────────────────
-     PRINCIPLE: "First touch shows UI only — never triggers actions"
-     
-     touchstart → immediately show controls (finger-down = instant UI)
-     touchend   → count taps for double-tap detection
-     
-     Single tap (after 280ms debounce):
-       → If panel was hidden: already shown by touchstart, reset timer
-       → If panel was visible: reset the 2.5s hide timer (keep visible)
-       → NEVER pauses video on mobile
-     
-     Double tap:
-       Left 40%   → seek −10s
-       Right 40%  → seek +10s
-       Centre 20% → ignored (safe zone)
-  ────────────────────────────────────────────────────────────────── */
-  let tapTimer = null, tapCount = 0, tapX = 0;
-  let swipeSY = 0, swipeSX = 0, swipeST = 0;
-
-  $('player-wrap').addEventListener('touchstart', e => {
-    if (e.target.closest('#ctrl-bar')) return;
-    if (e.target.closest('#centre-btn')) return;
-    swipeSY = e.touches[0].clientY;
-    swipeSX = e.touches[0].clientX;
-    swipeST = Date.now();
-    showCtrl();
-  }, { passive: true });
-
-  $('player-wrap').addEventListener('touchend', e => {
-    if (e.target.closest('#ctrl-bar')) return;
-    if (e.target.closest('#centre-btn')) return;
-
-    // Свайп вниз → выход из псевдофулскрина
-    const swipeDy = e.changedTouches[0].clientY - swipeSY;
-    const swipeDx = Math.abs(e.changedTouches[0].clientX - swipeSX);
-    const swipeMs = Date.now() - swipeST;
-    if (pseudoFSActive && swipeDy > 80 && swipeDx < 60 && swipeMs < 500) {
-      togglePseudoFS();
-      return;
-    }
-
-    tapCount++;
-    tapX = e.changedTouches[0].clientX;
-
-    if (tapCount === 1) {
-      tapTimer = setTimeout(() => {
-        tapCount = 0;
-        // Single tap resolved: panel is already visible (shown on touchstart).
-        // Just reset the timer — showCtrl() does exactly that.
-        showCtrl();
-      }, 280);
-    } else if (tapCount >= 2) {
-      clearTimeout(tapTimer);
-      tapCount = 0;
-      const rect = $('player-wrap').getBoundingClientRect();
-      const relX = tapX - rect.left;
-      const w    = rect.width;
-      // Double-tap seek: ONLY for MP4, not YouTube
-      // YouTube has its own seek and our overlay would conflict
-      if (!isYT) {
-        if (relX < w * 0.40) {
-          seekRel(-10); showCtrl(); showSeekFeedback(-10);
-        } else if (relX > w * 0.60) {
-          seekRel(+10); showCtrl(); showSeekFeedback(+10);
-        }
-        // Centre 20% → intentionally no action
-      }
-    }
-  }, { passive: true });
-
-  $('player-wrap').addEventListener('mousemove', showCtrl);
-
-  /* ── Video element events ── */
-  v.addEventListener('play',  () => { syncPlayIcon(true);  lastPlayTs = Date.now(); });
-  v.addEventListener('pause', () => {
-    syncPlayIcon(false);
-    // Пункт 7: анти-петля — если видео запущено менее 3с назад, не шлём pause в Firebase
-    // Это защита от ситуации, когда буфер ещё не загружен и Safari ставит паузу сам
-    if (Date.now() - lastPlayTs < 3000) return;
-    if (!suppressSync && !chatOnlyMode) pushSync();
-  });
-  v.addEventListener('timeupdate',     updateProg);
-  v.addEventListener('durationchange', updateProg);
-  v.addEventListener('waiting',        () => setSS('warn','Буферизация…'));
-  v.addEventListener('loadedmetadata', updateCtrlBarPosition);
-  v.addEventListener('canplay',        () => setSS('ok','Синхронизировано'));
-
-  /* ── YT progress ticker ── */
-  setInterval(() => {
-    if (isYT && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
-      updateProgValues(ytPlayer.getCurrentTime(), ytPlayer.getDuration());
-    }
-  }, 500);
-
-  /* ── YT state polling — iOS fallback (onStateChange ненадёжен на Safari) ── */
-  let _ytPollState = -1;
-  setInterval(() => {
-    if (!isYT || !ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
-    try {
-      const s = ytPlayer.getPlayerState();
-      if (s === _ytPollState) return;
-      _ytPollState = s;
-      if (s === YT.PlayerState.BUFFERING || s === YT.PlayerState.UNSTARTED) return;
-      if (!suppressSync && !chatOnlyMode) {
-        clearTimeout(ytSyncTimer);
-        ytSyncTimer = setTimeout(() => pushSync(), 600);
-      }
-    } catch(_) {}
-  }, 1000);
-
-  /* ── Fullscreen change ── */
-  $('fs-btn').innerHTML = FS_ICON_ENTER;
-
-  ['fullscreenchange','webkitfullscreenchange'].forEach(ev =>
-    document.addEventListener(ev, () => {
-      const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
-      $('fs-btn').innerHTML = isFS ? FS_ICON_EXIT : FS_ICON_ENTER;
-      showCtrl();
-      setTimeout(updateCtrlBarPosition, 50);
-    })
-  );
-  window.addEventListener('resize', updateCtrlBarPosition);
-
-  /* Sync play/pause icon — module-level so buildYT can reach it */
+/* ── Player helpers — module level (видны всему коду) ── */
 function syncPlayIcon(playing) {
   $('play-btn').textContent = playing ? '⏸' : '▶';
   const svg = $('centre-icon');
@@ -1704,8 +1476,6 @@ function syncPlayIcon(playing) {
       : '<polygon points="5,3 19,12 5,21"/>';
   }
 }
-  
-/* Player helpers */
 function isPlaying() {
   if (isYT) return ytPlayer ? ytPlayer.getPlayerState() === 1 : false;
   const v = $('vid'); return !v.paused && !v.ended;
@@ -1714,8 +1484,7 @@ function getCur() {
   if (isYT) {
     try {
       return ytPlayer && typeof ytPlayer.getCurrentTime === 'function'
-        ? ytPlayer.getCurrentTime()
-        : 0;
+        ? ytPlayer.getCurrentTime() : 0;
     } catch(_) { return 0; }
   }
   return $('vid').currentTime || 0;
@@ -1731,7 +1500,6 @@ function seekAbs(t, broadcast) {
   if (broadcast) pushSync();
 }
 function seekRel(d) { seekAbs(getCur() + d, true); }
-
 function togglePlay() {
   if (isYT) {
     if (!ytPlayer) return;
@@ -1743,49 +1511,37 @@ function togglePlay() {
     else v.pause();
   }
 }
-
 function updateProg() {
   updateProgValues($('vid').currentTime, $('vid').duration);
 }
 function updateProgValues(cur, dur) {
   if (!dur || !isFinite(dur)) return;
   const pct = Math.min(100, (cur / dur) * 100);
-  $('prog-fill').style.width  = pct + '%';
-  $('prog-thumb').style.left  = pct + '%';
-  $('time-lbl').textContent   = fmt(cur) + ' / ' + fmt(dur);
+  $('prog-fill').style.width = pct + '%';
+  $('prog-thumb').style.left = pct + '%';
+  $('time-lbl').textContent  = fmt(cur) + ' / ' + fmt(dur);
 }
 function fmt(s) {
   if (!isFinite(s)||isNaN(s)) return '0:00';
   const m = Math.floor(s/60)|0, ss = Math.floor(s%60)|0;
   return m + ':' + String(ss).padStart(2,'0');
 }
-
-/* ── Controls visibility ─────────────────────────────────────────────
-   Desktop (no touch): controls always visible, auto-hide only in FS.
-   Touch device (mobile/tablet): always auto-hide after CTRL_TIMEOUT.
-   showCtrl() is safe to call repeatedly — it always restarts the timer.
-────────────────────────────────────────────────────────────────────── */
 const isTouchDevice = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-
 function showCtrl() {
   ctrlVisible = true;
   $('ctrl-overlay').classList.remove('hidden');
   clearTimeout(ctrlHideTimer);
   const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
-  // Auto-hide on: any fullscreen mode, OR any touch device
   if (isFS || isTouchDevice()) {
     ctrlHideTimer = setTimeout(hideCtrl, CTRL_TIMEOUT);
   }
 }
 function hideCtrl() {
   const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
-  // Keep visible on desktop outside fullscreen
   if (!isFS && !isTouchDevice()) return;
   ctrlVisible = false;
   $('ctrl-overlay').classList.add('hidden');
 }
-
-/* Seek feedback flash for mobile double-tap */
 function showSeekFeedback(seconds) {
   const id = 'sf_' + (seconds < 0 ? 'l' : 'r');
   let el = document.getElementById(id);
@@ -1812,9 +1568,7 @@ function showSeekFeedback(seconds) {
   clearTimeout(el._t);
   el._t = setTimeout(() => { el.style.opacity = '0'; }, 800);
 }
-
-
-  function updateCtrlBarPosition() {
+function updateCtrlBarPosition() {
   const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
   const ctrlBar = $('ctrl-bar');
   if (!pseudoFSActive && !isFS) {
@@ -1832,9 +1586,8 @@ function showSeekFeedback(seconds) {
   const vr = v.videoWidth / v.videoHeight;
   const cr = cw / ch;
   if (vr > cr) {
-    // Широкоэкранное видео в вертикальном экране — чёрные полосы сверху и снизу
-    const renderedH  = cw / vr;
-    const blackBarH  = (ch - renderedH) / 2;
+    const renderedH = cw / vr;
+    const blackBarH = (ch - renderedH) / 2;
     ctrlBar.style.position = 'absolute';
     ctrlBar.style.bottom   = Math.max(0, blackBarH) + 'px';
     ctrlBar.style.left     = '0';
@@ -1847,7 +1600,178 @@ function showSeekFeedback(seconds) {
   }
 }
 
+function initPlayer() {
+  const v   = $('vid');
+  const pw  = $('prog-wrap');
+  const vol = $('vol-range');
+
+  $('play-btn').onclick   = e => { e.stopPropagation(); togglePlay(); pushSync(); };
+  $('centre-btn').onclick = e => { e.stopPropagation(); togglePlay(); pushSync(); showCtrl(); };
+
+  $('yt-shield').onclick = e => {
+    e.stopPropagation();
+    if (!isTouchDevice()) { togglePlay(); pushSync(); showCtrl(); }
+    else { showCtrl(); }
+  };
+
+  $('back-btn').onclick = e => { e.stopPropagation(); seekRel(-10); };
+  $('fwd-btn').onclick  = e => { e.stopPropagation(); seekRel(+10); };
+
+  /* ── Progress drag ── */
+  function seekFromX(clientX) {
+    const r = pw.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    const dur = getDur();
+    if (!dur) return;
+    seekAbs(pct * dur, false);
+  }
+  pw.addEventListener('mousedown', e => {
+    progDragging = true; pw.classList.add('drag');
+    seekFromX(e.clientX); e.preventDefault(); e.stopPropagation();
+  });
+  pw.addEventListener('touchstart', e => {
+    progDragging = true; pw.classList.add('drag');
+    seekFromX(e.touches[0].clientX); showCtrl(); e.stopPropagation();
+  }, { passive: true });
+  document.addEventListener('mousemove', e => { if (progDragging) seekFromX(e.clientX); });
+  document.addEventListener('touchmove', e => {
+    if (progDragging) seekFromX(e.touches[0].clientX);
+  }, { passive: true });
+  function endDrag() {
+    if (!progDragging) return;
+    progDragging = false;
+    $('prog-wrap').classList.remove('drag');
+    pushSync();
+  }
+  document.addEventListener('mouseup',  endDrag);
+  document.addEventListener('touchend', endDrag);
+
+  /* Volume */
+  vol.oninput = e => {
+    v.volume = +e.target.value;
+    $('mute-btn').textContent = +e.target.value > 0 ? '🔊' : '🔇';
+  };
+  $('mute-btn').onclick = e => {
+    e.stopPropagation();
+    v.muted = !v.muted;
+    $('mute-btn').textContent = v.muted ? '🔇' : '🔊';
+  };
+  $('vol-range').onclick = e => e.stopPropagation();
+
+  $('fs-btn').onclick = e => { e.stopPropagation(); toggleFS(); };
+
+  /* Tap-to-play overlay (iOS autoplay blocked) */
+  const ttp = $('tap-to-play');
+  if (ttp) {
+    ttp.addEventListener('click', () => {
+      $('vid').play().then(() => { ttp.style.display = 'none'; }).catch(() => {});
+    });
+    ttp.addEventListener('touchend', e => {
+      e.preventDefault();
+      $('vid').play().then(() => { ttp.style.display = 'none'; }).catch(() => {});
+    });
+  }
+  v.addEventListener('play', () => { if (ttp) ttp.style.display = 'none'; });
+
+  /* Desktop: click on video = play/pause */
+  $('player-wrap').addEventListener('click', e => {
+    if (isTouchDevice()) return;
+    if (e.target.closest('#ctrl-bar'))   return;
+    if (e.target.closest('#centre-btn')) return;
+    if (e.target.closest('#sync-pill'))  return;
+    if (e.target.closest('#user-pill'))  return;
+    if (e.target.closest('#yt-shield'))  return;
+    togglePlay(); pushSync(); showCtrl();
+  });
+
+  /* Mobile tap handling */
+  let tapTimer = null, tapCount = 0, tapX = 0;
+  let swipeSY = 0, swipeSX = 0, swipeST = 0;
+
+  $('player-wrap').addEventListener('touchstart', e => {
+    if (e.target.closest('#ctrl-bar') || e.target.closest('#centre-btn')) return;
+    swipeSY = e.touches[0].clientY;
+    swipeSX = e.touches[0].clientX;
+    swipeST = Date.now();
+    showCtrl();
+  }, { passive: true });
+
+  $('player-wrap').addEventListener('touchend', e => {
+    if (e.target.closest('#ctrl-bar') || e.target.closest('#centre-btn')) return;
+    const swipeDy = e.changedTouches[0].clientY - swipeSY;
+    const swipeDx = Math.abs(e.changedTouches[0].clientX - swipeSX);
+    const swipeMs = Date.now() - swipeST;
+    if (pseudoFSActive && swipeDy > 80 && swipeDx < 60 && swipeMs < 500) {
+      togglePseudoFS(); return;
+    }
+    tapCount++;
+    tapX = e.changedTouches[0].clientX;
+    if (tapCount === 1) {
+      tapTimer = setTimeout(() => { tapCount = 0; showCtrl(); }, 280);
+    } else if (tapCount >= 2) {
+      clearTimeout(tapTimer);
+      tapCount = 0;
+      const rect = $('player-wrap').getBoundingClientRect();
+      const relX = tapX - rect.left;
+      const w    = rect.width;
+      if (!isYT) {
+        if      (relX < w * 0.40) { seekRel(-10); showCtrl(); showSeekFeedback(-10); }
+        else if (relX > w * 0.60) { seekRel(+10); showCtrl(); showSeekFeedback(+10); }
+      }
+    }
+  }, { passive: true });
+
+  $('player-wrap').addEventListener('mousemove', showCtrl);
+
+  /* Video events */
+  v.addEventListener('play',  () => { syncPlayIcon(true);  lastPlayTs = Date.now(); });
+  v.addEventListener('pause', () => {
+    syncPlayIcon(false);
+    if (Date.now() - lastPlayTs < 3000) return;
+    if (!suppressSync && !chatOnlyMode) pushSync();
+  });
+  v.addEventListener('timeupdate',     updateProg);
+  v.addEventListener('durationchange', updateProg);
+  v.addEventListener('waiting',        () => setSS('warn','Буферизация…'));
+  v.addEventListener('loadedmetadata', updateCtrlBarPosition);
+  v.addEventListener('canplay',        () => setSS('ok','Синхронизировано'));
+
+  /* YT progress ticker */
+  setInterval(() => {
+    if (isYT && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+      updateProgValues(ytPlayer.getCurrentTime(), ytPlayer.getDuration());
+    }
+  }, 500);
+
+  /* YT state polling — iOS fallback */
+  let _ytPollState = -1;
+  setInterval(() => {
+    if (!isYT || !ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
+    try {
+      const s = ytPlayer.getPlayerState();
+      if (s === _ytPollState) return;
+      _ytPollState = s;
+      if (s === YT.PlayerState.BUFFERING || s === YT.PlayerState.UNSTARTED) return;
+      if (!suppressSync && !chatOnlyMode) {
+        clearTimeout(ytSyncTimer);
+        ytSyncTimer = setTimeout(() => pushSync(), 600);
+      }
+    } catch(_) {}
+  }, 1000);
+
+  /* Fullscreen change */
+  $('fs-btn').innerHTML = FS_ICON_ENTER;
+  ['fullscreenchange','webkitfullscreenchange'].forEach(ev =>
+    document.addEventListener(ev, () => {
+      const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      $('fs-btn').innerHTML = isFS ? FS_ICON_EXIT : FS_ICON_ENTER;
+      showCtrl();
+      setTimeout(updateCtrlBarPosition, 50);
+    })
+  );
+  window.addEventListener('resize', updateCtrlBarPosition);
 }
+  
 /* Fullscreen — with iPhone fallback (webkitEnterFullscreen on <video>) */
 function toggleFS() {
   // iOS Safari: стандартный fullscreen API недоступен — используем псевдорежим
