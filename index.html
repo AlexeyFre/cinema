@@ -1382,6 +1382,7 @@ function destroyYT() {
   if (ytPlayer) { try { ytPlayer.destroy(); } catch(_){} ytPlayer = null; }
   $('yt-inner').innerHTML = '';
   isYT = false;
+  ytLoadingId = null;
 }
 
 function applyVtt() {
@@ -2058,10 +2059,12 @@ function initChat() {
     btn.onclick = () => {
       const text = btn.dataset.phrase;
       if (!text) return;
-      push(db_chat, { type:'msg', text, name:myName, ts: serverTimestamp() })
-        .catch(e => console.error('quick phrase push:', e));
-    };
-  });
+      clearTimeout(typingTimer);
+    setTyping(false);
+    push(db_chat, { type:'msg', text, name:myName, ts: serverTimestamp() })
+      .catch(e => console.error('quick phrase push:', e));
+  };
+});
 
   // ── Listen to chat messages ──
   onValue(db_chat, snap => {
