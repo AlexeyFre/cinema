@@ -818,6 +818,48 @@ body {
   0%,100% { background: transparent; }
   30%     { background: rgba(201,149,110,.18); border-radius: 8px; }
 }
+
+  /* ── Pseudo-fullscreen (iOS Safari) ── */
+body.pseudo-fs #player-wrap {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 500;
+  width: 100% !important;
+  height: 100% !important;
+}
+body.pseudo-fs #topbar,
+body.pseudo-fs #vttbar,
+body.pseudo-fs #ccol {
+  display: none !important;
+}
+
+/* ── Уведомление о сообщении поверх псевдофулскрина ── */
+#fs-notif {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 600;
+  background: rgba(9,9,15,.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  padding: 10px 16px;
+  max-width: 280px;
+  width: 85%;
+  cursor: pointer;
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  transition: opacity .2s, transform .2s;
+  opacity: 0;
+}
+#fs-notif.on  { display: flex; opacity: 1; }
+#fs-notif.off { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+#fs-notif-name { font-size: 11px; color: var(--accent); letter-spacing: .05em; }
+#fs-notif-text { font-size: 13px; color: var(--text); line-height: 1.4; word-break: break-word; }
+  
 </style>
 </head>
 <body>
@@ -1035,6 +1077,12 @@ body {
 
 </div><!-- /app -->
 
+  
+  <div id="fs-notif">
+  <div id="fs-notif-name"></div>
+  <div id="fs-notif-text"></div>
+</div>
+  
 <div id="toast"></div>
 
 <!-- ════════════════════════════════════════════════════
@@ -1105,6 +1153,23 @@ let lastLocalActionTs = 0;    // timestamp of last local play/pause/seek — use
 
 /* ── Reply state ── */
 let replyToKey = null, replyToName = null, replyToText = null;
+
+
+  /* ── Fullscreen icons (module-level — нужны и initPlayer и togglePseudoFS) ── */
+const FS_ICON_ENTER = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+const FS_ICON_EXIT  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>`;
+
+/* ── Pseudo-fullscreen state ── */
+let pseudoFSActive = false;
+let fsNotifTimer   = null;
+let fsNotifKey     = null;
+let fsNotifName    = null;
+let fsNotifText    = null;
+
+/* ── iOS detection ── */
+function isIOS() {
+  return /iP(hone|ad|od)/.test(navigator.userAgent) && !window.MSStream;
+}
 
 /* ═══════════════════════════════════════════════════════
    ENTRY
@@ -1611,8 +1676,6 @@ function initPlayer() {
   }, 1000);
 
   /* ── Fullscreen change ── */
-  const FS_ICON_ENTER = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
-  const FS_ICON_EXIT  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>`;
   $('fs-btn').innerHTML = FS_ICON_ENTER;
 
   ['fullscreenchange','webkitfullscreenchange'].forEach(ev =>
@@ -1745,24 +1808,75 @@ function showSeekFeedback(seconds) {
 
 /* Fullscreen — with iPhone fallback (webkitEnterFullscreen on <video>) */
 function toggleFS() {
+  // iOS Safari: стандартный fullscreen API недоступен — используем псевдорежим
+  if (isIOS()) { togglePseudoFS(); return; }
+
   const wrap = $('player-wrap');
   const v    = $('vid');
   const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
 
   if (!isFS) {
-    if (wrap.requestFullscreen) {
-      wrap.requestFullscreen().catch(() => {});
-    } else if (wrap.webkitRequestFullscreen) {
-      wrap.webkitRequestFullscreen();
-    } else if (!isYT && v.webkitEnterFullscreen) {
-      // iPhone Safari: only the <video> element itself can go fullscreen
-      v.webkitEnterFullscreen();
-    }
+    if (wrap.requestFullscreen)            wrap.requestFullscreen().catch(() => {});
+    else if (wrap.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
   } else {
-    if (document.exitFullscreen)        document.exitFullscreen().catch(() => {});
-    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-    else if (!isYT && v.webkitExitFullscreen) v.webkitExitFullscreen();
+    if (document.exitFullscreen)               document.exitFullscreen().catch(() => {});
+    else if (document.webkitExitFullscreen)    document.webkitExitFullscreen();
   }
+}
+
+function togglePseudoFS() {
+  pseudoFSActive = !pseudoFSActive;
+  document.body.classList.toggle('pseudo-fs', pseudoFSActive);
+  $('fs-btn').innerHTML = pseudoFSActive ? FS_ICON_EXIT : FS_ICON_ENTER;
+  if (!pseudoFSActive) dismissFsNotif();
+  showCtrl();
+}
+
+function showFsNotif(key, name, text) {
+  if (!pseudoFSActive) return;
+  // Отменяем предыдущий таймер если сообщение пришло быстро
+  clearTimeout(fsNotifTimer);
+  fsNotifKey  = key;
+  fsNotifName = name;
+  fsNotifText = text;
+
+  const el = $('fs-notif');
+  $('fs-notif-name').textContent = name;
+  $('fs-notif-text').textContent = text;
+  el.classList.remove('off');
+  el.classList.add('on');
+
+  fsNotifTimer = setTimeout(dismissFsNotif, 2000);
+}
+
+function dismissFsNotif() {
+  const el = $('fs-notif');
+  el.classList.add('off');
+  setTimeout(() => { el.classList.remove('on', 'off'); }, 220);
+  clearTimeout(fsNotifTimer);
+}
+
+function initFsNotif() {
+  const el = $('fs-notif');
+
+  // Тап → выйти из псевдофулскрина + установить reply
+  el.addEventListener('click', () => {
+    dismissFsNotif();
+    if (pseudoFSActive) togglePseudoFS();
+    if (fsNotifKey) setReplyTo(fsNotifKey, fsNotifName, fsNotifText);
+  });
+
+  // Смахивание в любую сторону → закрыть
+  let swipeStartX = 0, swipeStartY = 0;
+  el.addEventListener('touchstart', e => {
+    swipeStartX = e.touches[0].clientX;
+    swipeStartY = e.touches[0].clientY;
+  }, { passive: true });
+  el.addEventListener('touchend', e => {
+    const dx = Math.abs(e.changedTouches[0].clientX - swipeStartX);
+    const dy = Math.abs(e.changedTouches[0].clientY - swipeStartY);
+    if (dx > 50 || dy > 50) dismissFsNotif();
+  }, { passive: true });
 }
 
 /* ── Keyboard shortcuts (desktop) ── */
@@ -2098,6 +2212,10 @@ function initChat() {
       newEntries.forEach(([k, m]) => {
         const node = buildMsg(m, k);
         if (node) msgs.appendChild(node);
+        // Уведомление поверх псевдофулскрина — только чужие сообщения
+        if (m && m.type === 'msg' && m.name !== myName) {
+          showFsNotif(k, m.name, m.text || '');
+        }
       });
 
       if (atBottom && newEntries.length > 0) {
@@ -2119,6 +2237,7 @@ function initChat() {
   }, err => console.error('chat listener error:', err));
 
   initReactions();
+  initFsNotif();
 }
 
 function sendMsg() {
