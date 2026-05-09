@@ -1571,33 +1571,37 @@ function showSeekFeedback(seconds) {
 function updateCtrlBarPosition() {
   const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
   const ctrlBar = $('ctrl-bar');
-  if (!pseudoFSActive && !isFS) {
+
+  function resetCtrl() {
     ctrlBar.style.position = '';
     ctrlBar.style.bottom   = '';
     ctrlBar.style.left     = '';
     ctrlBar.style.right    = '';
-    return;
   }
-  const v  = $('vid');
-  if (!v.videoWidth || !v.videoHeight) return;
-  const pw = $('player-wrap');
-  const cw = pw.clientWidth;
-  const ch = pw.clientHeight;
+
+  if (!pseudoFSActive && !isFS) { resetCtrl(); return; }
+
+  const v = $('vid');
+  if (!v.videoWidth || !v.videoHeight) { resetCtrl(); return; }
+
+  // window.inner* надёжнее pw.clientWidth в pseudo-fs на iOS
+  const cw = window.innerWidth;
+  const ch = window.innerHeight;
   const vr = v.videoWidth / v.videoHeight;
   const cr = cw / ch;
+
   if (vr > cr) {
     const renderedH = cw / vr;
     const blackBarH = (ch - renderedH) / 2;
-    ctrlBar.style.position = 'absolute';
-    ctrlBar.style.bottom   = Math.max(0, blackBarH) + 'px';
-    ctrlBar.style.left     = '0';
-    ctrlBar.style.right    = '0';
-  } else {
-    ctrlBar.style.position = '';
-    ctrlBar.style.bottom   = '';
-    ctrlBar.style.left     = '';
-    ctrlBar.style.right    = '';
+    if (blackBarH > 24) {
+      ctrlBar.style.position = 'absolute';
+      ctrlBar.style.bottom   = blackBarH + 'px';
+      ctrlBar.style.left     = '0';
+      ctrlBar.style.right    = '0';
+      return;
+    }
   }
+  resetCtrl();
 }
 
 function initPlayer() {
@@ -1770,6 +1774,9 @@ function initPlayer() {
     })
   );
   window.addEventListener('resize', updateCtrlBarPosition);
+  window.addEventListener('orientationchange', () => {
+  setTimeout(updateCtrlBarPosition, 300);
+});
 }
   
 /* Fullscreen — with iPhone fallback (webkitEnterFullscreen on <video>) */
@@ -1796,7 +1803,8 @@ function togglePseudoFS() {
   $('fs-btn').innerHTML = pseudoFSActive ? FS_ICON_EXIT : FS_ICON_ENTER;
   if (!pseudoFSActive) dismissFsNotif();
   showCtrl();
-  setTimeout(updateCtrlBarPosition, 50);
+  setTimeout(updateCtrlBarPosition, 120);
+setTimeout(updateCtrlBarPosition, 400); // повтор — iOS медленнее отдаёт размеры
 }
 
 function showFsNotif(key, name, text) {
