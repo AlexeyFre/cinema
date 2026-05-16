@@ -855,6 +855,26 @@ body.pseudo-fs #ccol {
   opacity: 0;
 }
 #fs-notif.on  { display: flex; opacity: 1; }
+  #fs-notif-heart {
+  position: absolute;
+  bottom: -18px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(9,9,15,.75);
+  border: 1px solid var(--border2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 17px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-appearance: none;
+  transition: transform .15s;
+}
+#fs-notif-heart:active { transform: scale(.85); }
 #fs-notif.off { opacity: 0; transform: translateY(-12px); }
 #fs-notif-name { font-size: 11px; color: var(--accent); letter-spacing: .05em; }
 #fs-notif-text { font-size: 13px; color: var(--text); line-height: 1.4; word-break: break-word; }
@@ -1080,6 +1100,7 @@ body.pseudo-fs #ccol {
   <div id="fs-notif">
   <div id="fs-notif-name"></div>
   <div id="fs-notif-text"></div>
+  <button id="fs-notif-heart">🤍</button>
 </div>
   
 <div id="toast"></div>
@@ -1852,6 +1873,16 @@ function initFsNotif() {
     const dy = Math.abs(e.changedTouches[0].clientY - swipeStartY);
     if (dx > 35 || dy > 35) dismissFsNotif();
   }, { passive: true });
+  // Кнопка ❤️ на уведомлении
+  const heartBtn = $('fs-notif-heart');
+  heartBtn.addEventListener('click', e => {
+    e.stopPropagation(); // не триггерить клик на самом уведомлении
+    if (fsNotifKey) toggleHeart(fsNotifKey, null);
+    dismissFsNotif();
+  });
+  heartBtn.addEventListener('touchend', e => {
+    e.stopPropagation();
+  }, { passive: true });
 }
 
 /* ── Keyboard shortcuts (desktop) ── */
@@ -2346,8 +2377,11 @@ function toggleHeart(key, div) {
   const safeKey = myName.replace(/[.#$\/\[\]]/g,'_');
   const heartRef = ref(db, 'rooms/' + roomId + '/reactions/' + key + '/hearts/' + safeKey);
   // Flash the bubble
-  const bbl = div.querySelector('.msg-bbl');
-  if (bbl) { bbl.classList.remove('tap-flash'); void bbl.offsetWidth; bbl.classList.add('tap-flash'); }
+  // Flash the bubble (только если div передан — в pseudo-fs его нет)
+  if (div) {
+    const bbl = div.querySelector('.msg-bbl');
+    if (bbl) { bbl.classList.remove('tap-flash'); void bbl.offsetWidth; bbl.classList.add('tap-flash'); }
+  }
   // Toggle in Firebase
   get(heartRef).then(snap => {
     if (snap.exists()) remove(heartRef);
