@@ -2475,6 +2475,7 @@ function initKeyboard() {
       const msgs = $('msgs');
       if (msgs) requestAnimationFrame(() => { msgs.scrollTop = msgs.scrollHeight; });
     }
+     }  // closes onVPResize
 
   window.visualViewport.addEventListener('resize', onVPResize);
   window.visualViewport.addEventListener('scroll', onVPResize);
