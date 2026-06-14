@@ -1726,8 +1726,13 @@ function initPlayer() {
     const swipeDy = e.changedTouches[0].clientY - swipeSY;
     const swipeDx = Math.abs(e.changedTouches[0].clientX - swipeSX);
     const swipeMs = Date.now() - swipeST;
-    if (pseudoFSActive && swipeDy > 80 && swipeDx < 60 && swipeMs < 500) {
-      togglePseudoFS(); return;
+   if (pseudoFSActive && swipeDy > 80 && swipeDx < 60 && swipeMs < 500) {
+      const wasPlaying = isPlaying();
+      togglePseudoFS();
+      if (wasPlaying && isYT && ytPlayer) {
+        setTimeout(() => { if (!isPlaying()) ytPlayer.playVideo(); }, 400);
+      }
+      return;
     }
     tapCount++;
     tapX = e.changedTouches[0].clientX;
@@ -2148,15 +2153,18 @@ function initChat() {
   });
 
   // ── Typing indicator ──
-  ta.addEventListener('focus', () => {
-    setTyping(true);
-    clearTimeout(typingTimer);
-  });
+ let lastTypingPush = 0;
   ta.addEventListener('input', () => {
-    setTyping(true);
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 90) + 'px';
     clearTimeout(typingTimer);
-    // Auto-clear if idle for 3s
     typingTimer = setTimeout(() => setTyping(false), 3000);
+    // Firebase пишем не чаще раза в 2 секунды — снижает лаг на iOS
+    const now = Date.now();
+    if (now - lastTypingPush > 2000) {
+      setTyping(true);
+      lastTypingPush = now;
+    }
   });
   ta.addEventListener('blur', () => {
     clearTimeout(typingTimer);
@@ -2459,12 +2467,14 @@ function initKeyboard() {
     const isPortrait  = window.innerWidth < window.innerHeight;
     const screenH     = window.screen.height;
     const kbOpen      = isPortrait && h < screenH * 0.65;
+    const wasKbOpen = app.classList.contains('kb-open');
     app.classList.toggle('kb-open', kbOpen);
 
-    // Scroll messages to bottom when keyboard opens/closes
-    const msgs = $('msgs');
-    if (msgs) requestAnimationFrame(() => { msgs.scrollTop = msgs.scrollHeight; });
-  }
+    // Прокручиваем только когда состояние клавиатуры МЕНЯЕТСЯ, не на каждый resize
+    if (kbOpen !== wasKbOpen) {
+      const msgs = $('msgs');
+      if (msgs) requestAnimationFrame(() => { msgs.scrollTop = msgs.scrollHeight; });
+    }
 
   window.visualViewport.addEventListener('resize', onVPResize);
   window.visualViewport.addEventListener('scroll', onVPResize);
