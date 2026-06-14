@@ -494,7 +494,7 @@ body {
   .cb        { padding: 5px 5px; }
   .cb.sm     { padding: 4px 4px; }
   /* Prevent iOS auto-zoom on inputs (requires font-size >= 16px) */
-  #url-inp, #vtt-inp { font-size: 16px; }
+  #url-inp, #vtt-inp, #chat-ta { font-size: 16px; }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1726,13 +1726,8 @@ function initPlayer() {
     const swipeDy = e.changedTouches[0].clientY - swipeSY;
     const swipeDx = Math.abs(e.changedTouches[0].clientX - swipeSX);
     const swipeMs = Date.now() - swipeST;
-   if (pseudoFSActive && swipeDy > 80 && swipeDx < 60 && swipeMs < 500) {
-      const wasPlaying = isPlaying();
-      togglePseudoFS();
-      if (wasPlaying && isYT && ytPlayer) {
-        setTimeout(() => { if (!isPlaying()) ytPlayer.playVideo(); }, 400);
-      }
-      return;
+    if (pseudoFSActive && swipeDy > 80 && swipeDx < 60 && swipeMs < 500) {
+      togglePseudoFS(); return;
     }
     tapCount++;
     tapX = e.changedTouches[0].clientX;
@@ -2146,29 +2141,46 @@ function initChat() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
   });
 
-  // Auto-resize textarea
+  // ── Throttled input handler (fixes keyboard lag on iOS) ──
+  // Problem: on every keystroke, setTyping(true) wrote to Firebase AND
+  // textarea auto-resize forced synchronous layout reflow. When typing
+  // fast (especially caps), this created 5-10 Firebase writes/sec +
+  // 5-10 layout reflows/sec, blocking the main thread on iPhone.
+  // Fix: throttle Firebase typing writes to max once per 2 seconds,
+  // and batch textarea resize with requestAnimationFrame.
+  let lastTypingPushTs = 0;
+  let taResizeRaf = null;
+
   ta.addEventListener('input', () => {
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 90) + 'px';
+    // Debounced auto-resize — batch with next paint, not on every keystroke
+    if (!taResizeRaf) {
+      taResizeRaf = requestAnimationFrame(() => {
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 90) + 'px';
+        taResizeRaf = null;
+      });
+    }
+
+    // Throttled typing indicator — first keystroke always sends,
+    // then at most once every 2 seconds (receiver shows "typing" for 8s)
+    const now = Date.now();
+    if (lastTypingPushTs === 0 || now - lastTypingPushTs > 2000) {
+      lastTypingPushTs = now;
+      setTyping(true);
+    }
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => { setTyping(false); lastTypingPushTs = 0; }, 3000);
   });
 
-  // ── Typing indicator ──
- let lastTypingPush = 0;
-  ta.addEventListener('input', () => {
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 90) + 'px';
+  ta.addEventListener('focus', () => {
+    setTyping(true);
+    lastTypingPushTs = Date.now();
     clearTimeout(typingTimer);
-    typingTimer = setTimeout(() => setTyping(false), 3000);
-    // Firebase пишем не чаще раза в 2 секунды — снижает лаг на iOS
-    const now = Date.now();
-    if (now - lastTypingPush > 2000) {
-      setTyping(true);
-      lastTypingPush = now;
-    }
   });
   ta.addEventListener('blur', () => {
     clearTimeout(typingTimer);
     setTyping(false);
+    lastTypingPushTs = 0;
   });
 
   // ── Listen to typing status ──
@@ -2467,15 +2479,12 @@ function initKeyboard() {
     const isPortrait  = window.innerWidth < window.innerHeight;
     const screenH     = window.screen.height;
     const kbOpen      = isPortrait && h < screenH * 0.65;
-    const wasKbOpen = app.classList.contains('kb-open');
     app.classList.toggle('kb-open', kbOpen);
 
-    // Прокручиваем только когда состояние клавиатуры МЕНЯЕТСЯ, не на каждый resize
-    if (kbOpen !== wasKbOpen) {
-      const msgs = $('msgs');
-      if (msgs) requestAnimationFrame(() => { msgs.scrollTop = msgs.scrollHeight; });
-    }
-     }  // closes onVPResize
+    // Scroll messages to bottom when keyboard opens/closes
+    const msgs = $('msgs');
+    if (msgs) requestAnimationFrame(() => { msgs.scrollTop = msgs.scrollHeight; });
+  }
 
   window.visualViewport.addEventListener('resize', onVPResize);
   window.visualViewport.addEventListener('scroll', onVPResize);
