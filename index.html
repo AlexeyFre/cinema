@@ -1088,7 +1088,7 @@ body.pseudo-fs #ccol {
 
     <!-- Input -->
     <div id="chat-inp-wrap">
-      <textarea id="chat-ta" rows="1" placeholder="Сообщение…"></textarea>
+      <textarea id="chat-ta" rows="1" placeholder="Сообщение…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
       <button id="send-btn">➤</button>
     </div>
 
@@ -2148,11 +2148,9 @@ function initChat() {
   // 5-10 layout reflows/sec, blocking the main thread on iPhone.
   // Fix: throttle Firebase typing writes to max once per 2 seconds,
   // and batch textarea resize with requestAnimationFrame.
-  let lastTypingPushTs = 0;
   let taResizeRaf = null;
 
   ta.addEventListener('input', () => {
-    // Debounced auto-resize — batch with next paint, not on every keystroke
     if (!taResizeRaf) {
       taResizeRaf = requestAnimationFrame(() => {
         ta.style.height = 'auto';
@@ -2160,27 +2158,23 @@ function initChat() {
         taResizeRaf = null;
       });
     }
-
-    // Throttled typing indicator — first keystroke always sends,
-    // then at most once every 2 seconds (receiver shows "typing" for 8s)
-    const now = Date.now();
-    if (lastTypingPushTs === 0 || now - lastTypingPushTs > 2000) {
-      lastTypingPushTs = now;
-      setTyping(true);
-    }
-    clearTimeout(typingTimer);
-    typingTimer = setTimeout(() => { setTyping(false); lastTypingPushTs = 0; }, 3000);
   });
 
   ta.addEventListener('focus', () => {
     setTyping(true);
-    lastTypingPushTs = Date.now();
     clearTimeout(typingTimer);
   });
   ta.addEventListener('blur', () => {
     clearTimeout(typingTimer);
     setTyping(false);
-    lastTypingPushTs = 0;
+  });
+
+  // Keep typing indicator refreshed while typing (throttled)
+  let typingKeepAliveTimer = null;
+  ta.addEventListener('input', () => {
+    setTyping(true);
+    clearTimeout(typingKeepAliveTimer);
+    typingKeepAliveTimer = setTimeout(() => setTyping(false), 3000);
   });
 
   // ── Listen to typing status ──
@@ -2465,30 +2459,30 @@ function initKeyboard() {
 
   // Pin #app to the visual viewport at all times.
   // This keeps both the video AND the chat input visible above the keyboard.
+  let lastVPTop = -1, lastVPH = -1;
   function onVPResize() {
     const vv  = window.visualViewport;
     const top = Math.round(vv.offsetTop);
     const h   = Math.round(vv.height);
+    if (top === lastVPTop && h === lastVPH) return;
+    lastVPTop = top; lastVPH = h;
     app.style.position = 'fixed';
     app.style.top      = top + 'px';
     app.style.left     = '0';
     app.style.width    = '100%';
     app.style.height   = h + 'px';
 
-    // Detect keyboard open in portrait: app height < 78% of screen height
     const isPortrait  = window.innerWidth < window.innerHeight;
     const screenH     = window.screen.height;
     const kbOpen      = isPortrait && h < screenH * 0.65;
     app.classList.toggle('kb-open', kbOpen);
 
-    // Scroll messages to bottom when keyboard opens/closes
     const msgs = $('msgs');
     if (msgs) requestAnimationFrame(() => { msgs.scrollTop = msgs.scrollHeight; });
   }
 
   window.visualViewport.addEventListener('resize', onVPResize);
   window.visualViewport.addEventListener('scroll', onVPResize);
-  window.addEventListener('resize', onVPResize);
 
   // Fix for "input not above keyboard on quick re-focus":
   // When textarea is focused, force a layout recalculation after a small delay
